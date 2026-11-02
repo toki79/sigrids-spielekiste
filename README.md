@@ -39,6 +39,11 @@ npm run typecheck # TypeScript prüfen
 
 ### App ausprobieren
 
+**Am einfachsten – im Browser, ohne Installation:**
+https://toki79.github.io/sigrids-spielekiste/ (wird bei jedem Push auf `main`
+automatisch neu gebaut; auf dem iPhone in Safari über „Teilen → Zum Home-Bildschirm“
+wie eine App ablegen).
+
 **Auf dem Handy (Expo Go):**
 
 1. App „Expo Go“ aus dem App Store bzw. Play Store installieren.
