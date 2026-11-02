@@ -6,7 +6,7 @@
  * (Aufruf der Web-Version mit `?backend=local`).
  */
 import { generateFamilyCode, normalizeFamilyCode } from "@spielestube/core";
-import type { WoerterState } from "@spielestube/woerterei";
+import type { AnyState } from "../games/registry";
 import { gameFields, newId, type Family, type OnlineBackend, type OnlineGame } from "./types";
 
 interface Db {
@@ -58,7 +58,8 @@ function toGame(id: string, db: Db): OnlineGame | null {
   const g = db.games[id];
   if (!g) return null;
   const { stateJson, ...rest } = g;
-  return { ...rest, id, state: JSON.parse(stateJson) as WoerterState };
+  const state = JSON.parse(stateJson) as AnyState;
+  return { ...rest, gameType: state.game ?? "woerterei", id, state };
 }
 
 export class LocalBackend implements OnlineBackend {
@@ -111,7 +112,7 @@ export class LocalBackend implements OnlineBackend {
     }
   }
 
-  async createGame(code: string, state: WoerterState) {
+  async createGame(code: string, state: AnyState) {
     const db = read();
     const id = newId();
     db.games[id] = { id, familyCode: normalizeFamilyCode(code), ...gameFields(state), updatedAt: Date.now(), stateJson: JSON.stringify(state) };
@@ -143,7 +144,7 @@ export class LocalBackend implements OnlineBackend {
     return subscribe(() => onChange(toGame(gameId, read())));
   }
 
-  async submitMove(_code: string, gameId: string, expectedMoveCount: number, next: WoerterState) {
+  async submitMove(_code: string, gameId: string, expectedMoveCount: number, next: AnyState) {
     const db = read();
     const g = db.games[gameId];
     if (!g || g.moveCount !== expectedMoveCount) return "conflict" as const;

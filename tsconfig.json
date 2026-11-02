@@ -3,8 +3,12 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
-    "types": ["node"],
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
@@ -15,9 +19,19 @@
     "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
-      "@spielestube/core": ["packages/core/src/index.ts"],
-      "@spielestube/woerterei": ["packages/woerterei/src/index.ts"]
+      "@spielestube/core": [
+        "packages/core/src/index.ts"
+      ],
+      "@spielestube/woerterei": [
+        "packages/woerterei/src/index.ts"
+      ],
+      "@spielestube/zahlenromme": [
+        "packages/zahlenromme/src/index.ts"
+      ]
     }
   },
-  "include": ["packages/*/src", "packages/*/test"]
+  "include": [
+    "packages/*/src",
+    "packages/*/test"
+  ]
 }

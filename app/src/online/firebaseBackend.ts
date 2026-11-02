@@ -27,7 +27,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import { generateFamilyCode, normalizeFamilyCode } from "@spielestube/core";
-import type { WoerterState } from "@spielestube/woerterei";
+import type { AnyState } from "../games/registry";
 import { createAuth } from "./firebaseAuth";
 import { firebaseConfig } from "./firebaseConfig";
 import { gameFields, newId, type Family, type OnlineBackend, type OnlineGame } from "./types";
@@ -46,10 +46,11 @@ function toFamily(code: string, data: DocumentData | undefined): Family | null {
 function toGame(code: string, id: string, data: DocumentData | undefined): OnlineGame | null {
   if (!data || typeof data.stateJson !== "string") return null;
   try {
-    const state = JSON.parse(data.stateJson) as WoerterState;
+    const state = JSON.parse(data.stateJson) as AnyState;
     return {
       id,
       familyCode: code,
+      gameType: state.game ?? data.gameType ?? "woerterei",
       playerIds: data.playerIds ?? state.players.map((p) => p.id),
       turnId: data.turnId ?? null,
       status: data.status === "beendet" ? "beendet" : "laeuft",
@@ -160,7 +161,7 @@ export class FirebaseBackend implements OnlineBackend {
     await updateDoc(doc(this.db, "families", normalizeFamilyCode(code)), { [`members.${memberId}.lastSeen`]: Date.now() });
   }
 
-  async createGame(code: string, state: WoerterState): Promise<string> {
+  async createGame(code: string, state: AnyState): Promise<string> {
     const id = newId();
     const now = Date.now();
     await setDoc(doc(this.db, "families", normalizeFamilyCode(code), "games", id), {
@@ -204,7 +205,7 @@ export class FirebaseBackend implements OnlineBackend {
     );
   }
 
-  async submitMove(code: string, gameId: string, expectedMoveCount: number, next: WoerterState) {
+  async submitMove(code: string, gameId: string, expectedMoveCount: number, next: AnyState) {
     const ref = doc(this.db, "families", normalizeFamilyCode(code), "games", gameId);
     return runTransaction(this.db, async (tx) => {
       const snap = await tx.get(ref);

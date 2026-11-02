@@ -1,12 +1,14 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Platform, SafeAreaView, StyleSheet, Text, View } from "react-native";
-import type { WoerterState } from "@spielestube/woerterei";
+import type { RommeState } from "@spielestube/zahlenromme";
 import { loadDictionary } from "./src/dictionary";
 import { getGame } from "./src/game";
+import { GAMES, GAME_LIST, type AnyState, type GameType } from "./src/games/registry";
 import { EndScreen } from "./src/screens/EndScreen";
 import { GameScreen } from "./src/screens/GameScreen";
 import { HandoverScreen } from "./src/screens/HandoverScreen";
+import { RommeScreen } from "./src/screens/RommeScreen";
 import { SetupScreen } from "./src/screens/SetupScreen";
 import { StartScreen } from "./src/screens/StartScreen";
 import { VoteScreen } from "./src/screens/VoteScreen";
@@ -20,26 +22,28 @@ type Screen = "laden" | "start" | "online" | "spieler" | "uebergabe" | "spiel" |
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("laden");
-  const [game, setGame] = useState<WoerterState | null>(null);
+  /** Gespeicherte Partien am selben Gerät, je Spiel. */
+  const [saved, setSaved] = useState<Partial<Record<GameType, AnyState | null>>>({});
+  /** Welches Spiel läuft gerade am selben Gerät? */
+  const [active, setActive] = useState<GameType>("woerterei");
   const [membership, setMembership] = useState<Membership | null>(null);
   const [invite, setInvite] = useState<string | null>(null);
+  const game = saved[active] ?? null;
 
   useEffect(() => {
-    // Erst den Ladebildschirm zeigen, dann Wörterbuch und gespeicherte Partie laden.
+    // Erst den Ladebildschirm zeigen, dann Wörterbuch und gespeicherte Partien laden.
     const t = setTimeout(async () => {
       loadDictionary();
-      setGame(await loadGame());
+      const loaded: Partial<Record<GameType, AnyState | null>> = {};
+      for (const g of GAME_LIST) loaded[g.type] = await loadGame(g.type);
+      setSaved(loaded);
       const m = await loadMembership();
       setMembership(m);
       // Über einen Einladungslink geöffnet?
       const code = parseInvite(await Linking.getInitialURL().catch(() => null));
       clearInviteFromAddressBar();
-      if (code && code !== m?.code) {
-        setInvite(code);
-        setScreen("online");
-      } else {
-        setScreen(code ? "online" : "start");
-      }
+      if (code && code !== m?.code) setInvite(code);
+      setScreen(code ? "online" : "start");
     }, 50);
     return () => clearTimeout(t);
   }, []);
@@ -56,26 +60,26 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
-  function update(next: WoerterState | null) {
-    setGame(next);
-    void saveGame(next);
+  function update(type: GameType, next: AnyState | null) {
+    setSaved((s) => ({ ...s, [type]: next }));
+    void saveGame(type, next);
   }
 
   function startGame(names: string[]) {
     const players = names.map((name, i) => ({ id: `s${i + 1}`, name }));
     const seed = Math.floor(Math.random() * 2 ** 31);
-    update(getGame().createGame(players, seed));
+    update(active, GAMES[active].create(players, seed));
     setScreen("uebergabe");
   }
 
-  function afterMove(next: WoerterState): Screen {
+  function afterMove(next: AnyState): Screen {
     if (next.status === "beendet") return "ende";
-    if (next.wordRequest) return "abstimmung";
+    if (next.game === "woerterei" && next.wordRequest) return "abstimmung";
     return "uebergabe";
   }
 
-  function onMove(next: WoerterState) {
-    update(next);
+  function onMove(next: AnyState) {
+    update(next.game, next);
     setScreen(afterMove(next));
   }
 
@@ -86,7 +90,7 @@ export default function App() {
         <View style={styles.center}>
           <Text style={styles.loadingTitle}>Sigrids Spielestube</Text>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Das Wörterbuch wird geladen …</Text>
+          <Text style={styles.loadingText}>Die Spiele werden geladen …</Text>
         </View>
       );
       break;
@@ -95,9 +99,17 @@ export default function App() {
         <StartScreen
           onlineName={membership?.name ?? null}
           onOnline={() => setScreen("online")}
-          savedGame={game}
-          onContinue={() => game && setScreen(afterMove(game))}
-          onNewGame={() => setScreen("spieler")}
+          saved={saved}
+          onContinue={(type) => {
+            const s = saved[type];
+            if (!s) return;
+            setActive(type);
+            setScreen(afterMove(s));
+          }}
+          onNewGame={(type) => {
+            setActive(type);
+            setScreen("spieler");
+          }}
         />
       );
       break;
@@ -113,39 +125,44 @@ export default function App() {
       );
       break;
     case "spieler":
-      content = <SetupScreen onStart={startGame} onBack={() => setScreen("start")} />;
+      content = <SetupScreen gameTitle={GAMES[active].title} onStart={startGame} onBack={() => setScreen("start")} />;
       break;
     case "uebergabe":
       content = game && <HandoverScreen state={game} onReveal={() => setScreen("spiel")} onMenu={() => setScreen("start")} />;
       break;
     case "abstimmung": {
-      const voterId = game?.wordRequest ? Object.entries(game.wordRequest.votes).find(([, v]) => v === null)?.[0] : undefined;
+      const w = game?.game === "woerterei" ? game : null;
+      const voterId = w?.wordRequest ? Object.entries(w.wordRequest.votes).find(([, v]) => v === null)?.[0] : undefined;
       content =
-        game && voterId ? (
+        w && voterId ? (
           <VoteScreen
-            key={`${voterId}-${game.moveCount}`}
-            state={game}
+            key={`${voterId}-${w.moveCount}`}
+            state={w}
             voterId={voterId}
             handover
-            onVote={(accept) => onMove(getGame().applyMove(game, voterId, { type: "abstimmen", accept }))}
+            onVote={(accept) => onMove(getGame().applyMove(w, voterId, { type: "abstimmen", accept }))}
             onMenu={() => setScreen("start")}
           />
         ) : null;
       break;
     }
     case "spiel":
-      content = game && <GameScreen state={game} onMove={onMove} onMenu={() => setScreen("start")} />;
+      content = !game ? null : game.game === "zahlenromme" ? (
+        <RommeScreen state={game as RommeState} onMove={onMove} onMenu={() => setScreen("start")} />
+      ) : (
+        <GameScreen state={game} onMove={onMove} onMenu={() => setScreen("start")} />
+      );
       break;
     case "ende":
       content = game && (
         <EndScreen
           state={game}
           onNewGame={() => {
-            update(null);
+            update(active, null);
             setScreen("spieler");
           }}
           onMenu={() => {
-            update(null);
+            update(active, null);
             setScreen("start");
           }}
         />

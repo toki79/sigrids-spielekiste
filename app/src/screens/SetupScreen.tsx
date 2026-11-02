@@ -4,12 +4,14 @@ import { BigButton } from "../components/BigButton";
 import { colors, font, radius, space, touchMin } from "../theme";
 
 interface Props {
+  /** Name des Spiels, z. B. „Wörterei“. */
+  gameTitle?: string;
   onStart: (names: string[]) => void;
   onBack: () => void;
 }
 
 /** Spieler eintragen: 2 bis 4 Namen. */
-export function SetupScreen({ onStart, onBack }: Props) {
+export function SetupScreen({ gameTitle, onStart, onBack }: Props) {
   const [names, setNames] = useState<string[]>(["", ""]);
   const filled = names.map((n) => n.trim()).filter(Boolean);
   const duplicate = new Set(filled.map((n) => n.toLowerCase())).size !== filled.length;
@@ -21,7 +23,7 @@ export function SetupScreen({ onStart, onBack }: Props) {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.wrap} keyboardShouldPersistTaps="handled">
         <Text style={styles.title} accessibilityRole="header">
-          Wer spielt mit?
+          {gameTitle ? `${gameTitle}: Wer spielt mit?` : "Wer spielt mit?"}
         </Text>
         <Text style={styles.text}>Tragt eure Namen in der Reihenfolge ein, in der ihr am Tisch sitzt.</Text>
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { BigButton } from "../../components/BigButton";
+import { GAME_LIST, GAMES, type GameType } from "../../games/registry";
 import type { Membership } from "../../online/session";
 import { isOnline, lastSeenText, type Family } from "../../online/types";
 import { colors, font, radius, space, touchMin } from "../../theme";
@@ -9,20 +10,50 @@ interface Props {
   membership: Membership;
   family: Family | null;
   busy: boolean;
-  onStart: (memberIds: string[]) => void;
+  onStart: (gameType: GameType, memberIds: string[]) => void;
   onBack: () => void;
 }
 
 /** Mitspieler aus der Familie auswählen (1 bis 3). */
 export function NewOnlineGameScreen({ membership, family, busy, onStart, onBack }: Props) {
   const [chosen, setChosen] = useState<string[]>([]);
+  const [gameType, setGameType] = useState<GameType | null>(null);
   const others = (family?.members ?? []).filter((m) => m.id !== membership.memberId);
 
   const toggle = (id: string) =>
     setChosen((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= 3 ? prev : [...prev, id]));
 
+  if (!gameType) {
+    return (
+      <ScrollView contentContainerStyle={styles.wrap}>
+        <Text style={styles.title} accessibilityRole="header">
+          Was möchtest du spielen?
+        </Text>
+        {GAME_LIST.map((g) => (
+          <Pressable
+            key={g.type}
+            onPress={() => setGameType(g.type)}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.gameCard, pressed && { opacity: 0.85 }]}
+            testID={`spiel-${g.type}`}
+          >
+            <Text style={styles.gameIcon}>{g.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{g.title}</Text>
+              <Text style={styles.seen}>{g.description}</Text>
+            </View>
+          </Pressable>
+        ))}
+        <BigButton label="Zurück" variant="secondary" onPress={onBack} />
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
+      <Text style={styles.gameChosen}>
+        {GAMES[gameType].icon} {GAMES[gameType].title}
+      </Text>
       <Text style={styles.title} accessibilityRole="header">
         Mit wem möchtest du spielen?
       </Text>
@@ -53,11 +84,11 @@ export function NewOnlineGameScreen({ membership, family, busy, onStart, onBack 
       })}
 
       <View style={styles.actions}>
-        <BigButton label="Zurück" variant="secondary" onPress={onBack} style={styles.action} />
+        <BigButton label="Zurück" variant="secondary" onPress={() => setGameType(null)} style={styles.action} />
         <BigButton
           label={busy ? "Einen Moment …" : "Partie starten"}
           disabled={chosen.length === 0 || busy}
-          onPress={() => onStart(chosen)}
+          onPress={() => onStart(gameType, chosen)}
           style={styles.action}
           testID="online-start"
         />
@@ -91,6 +122,18 @@ const styles = StyleSheet.create({
   dotOn: { backgroundColor: colors.success },
   dotOff: { backgroundColor: "#C4C4C4" },
   seen: { fontSize: font.small, color: colors.textMuted },
+  gameCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.m,
+    backgroundColor: colors.surface,
+    borderRadius: radius,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    padding: space.l,
+  },
+  gameIcon: { fontSize: 44 },
+  gameChosen: { fontSize: font.body, color: colors.textMuted, fontWeight: "700" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: space.m, marginTop: space.m },
   action: { flexGrow: 1, flexBasis: 200 },
 });

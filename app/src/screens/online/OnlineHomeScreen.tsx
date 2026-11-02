@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { formatFamilyCode } from "@spielestube/core";
-import { playersToAct } from "@spielestube/woerterei";
+import { gameOf } from "../../games/registry";
 import { BigButton } from "../../components/BigButton";
 import { inviteLink } from "../../online/invite";
 import type { Membership } from "../../online/session";
@@ -16,8 +16,8 @@ interface Props {
   onNewGame: () => void;
   onStats: () => void;
   onInvite: () => void;
-  /** Wer führt die Rangliste an? (leer, solange keine Partie beendet ist) */
-  champions: string[];
+  /** Wer führt die Ranglisten an? Je Spiel (nur Spiele mit beendeten Partien). */
+  champions: { title: string; icon: string; names: string[] }[];
   onBack: () => void;
   onLeave: () => void;
 }
@@ -28,13 +28,14 @@ function opponents(game: OnlineGame, meId: string): string {
 }
 
 function scoreLine(game: OnlineGame): string {
-  return game.state.players.map((p) => `${p.name} ${p.score}`).join(" · ");
+  const info = gameOf(game.state);
+  return game.state.players.map((p) => `${p.name}: ${info.playerLine(game.state, p.id)}`).join(" · ");
 }
 
 /** „Meine Partien“: wer ist dran, neue Partie, Familiencode. */
 export function OnlineHomeScreen({ membership, family, games, connectionProblem, onOpenGame, onNewGame, onStats, onInvite, champions, onBack, onLeave }: Props) {
   const me = membership.memberId;
-  const needsMe = (g: OnlineGame) => playersToAct(g.state).includes(me);
+  const needsMe = (g: OnlineGame) => gameOf(g.state).playersToAct(g.state).includes(me);
   const mine = (games ?? []).filter((g) => g.status === "laeuft" && needsMe(g));
   const waiting = (games ?? []).filter((g) => g.status === "laeuft" && !needsMe(g));
   const done = (games ?? []).filter((g) => g.status === "beendet").slice(0, 5);
@@ -51,11 +52,13 @@ export function OnlineHomeScreen({ membership, family, games, connectionProblem,
         style={({ pressed }) => [styles.game, kind === "mine" && styles.gameMine, pressed && styles.pressed]}
         testID={`partie-${kind}`}
       >
-        <Text style={styles.gameTitle}>Wörterei mit {opponents(g, me)}</Text>
+        <Text style={styles.gameTitle}>
+          {gameOf(g.state).icon} {gameOf(g.state).title} mit {opponents(g, me)}
+        </Text>
         <Text style={[styles.gameState, kind === "mine" && styles.gameStateMine]}>
           {kind === "done"
             ? `Beendet – ${winner?.name} hat gewonnen`
-            : g.state.wordRequest
+            : "wordRequest" in g.state && g.state.wordRequest
               ? kind === "mine"
                 ? "Bitte ein Wort prüfen!"
                 : "Abstimmung über ein Wort läuft"
@@ -83,9 +86,13 @@ export function OnlineHomeScreen({ membership, family, games, connectionProblem,
       {champions.length > 0 && (
         <Pressable onPress={onStats} accessibilityRole="button" style={({ pressed }) => [styles.champ, pressed && styles.pressed]} testID="champion-banner">
           <Text style={styles.champCrown}>👑</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.champLabel}>{champions.length > 1 ? "Familien-Champions" : "Familien-Champion"}</Text>
-            <Text style={styles.champName}>{champions.join(" & ")}</Text>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.champLabel}>Familien-Champions</Text>
+            {champions.map((c) => (
+              <Text key={c.title} style={styles.champName}>
+                {c.icon} {c.title}: {c.names.join(" & ")}
+              </Text>
+            ))}
           </View>
           <Text style={styles.champLink}>Rangliste ›</Text>
         </Pressable>

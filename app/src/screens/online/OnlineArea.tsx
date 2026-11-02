@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from "react-native";
-import { computeStats, type WoerterState } from "@spielestube/woerterei";
+import type { WoerterState } from "@spielestube/woerterei";
+import type { RommeState } from "@spielestube/zahlenromme";
+import { GAME_LIST, GAMES, type AnyState, type GameStats, type GameType } from "../../games/registry";
 import { BigButton } from "../../components/BigButton";
 import { Dialog } from "../../components/Dialog";
 import { getGame } from "../../game";
@@ -15,6 +17,7 @@ import { EndScreen } from "../EndScreen";
 import { VoteScreen } from "../VoteScreen";
 import { StatsScreen } from "./StatsScreen";
 import { GameScreen } from "../GameScreen";
+import { RommeScreen } from "../RommeScreen";
 import { FamilySetupScreen } from "./FamilySetupScreen";
 import { NewOnlineGameScreen } from "./NewOnlineGameScreen";
 import { OnlineHomeScreen } from "./OnlineHomeScreen";
@@ -100,7 +103,12 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
     return getBackend().watchGame(membership.code, gameId, setGame);
   }, [membership?.code, gameId]);
 
-  const stats = useMemo(() => (familyGames ? computeStats(familyGames.map((g) => g.state)) : null), [familyGames]);
+  const stats = useMemo(() => {
+    if (!familyGames) return null;
+    const out = {} as Record<GameType, GameStats>;
+    for (const g of GAME_LIST) out[g.type] = g.stats(familyGames.filter((x) => x.state.game === g.type).map((x) => x.state));
+    return out;
+  }, [familyGames]);
 
   const onlineIds = useMemo(() => new Set((family?.members ?? []).filter((m) => isOnline(m)).map((m) => m.id)), [family]);
 
@@ -119,13 +127,13 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
     );
   }
 
-  async function startGame(memberIds: string[]) {
+  async function startGame(gameType: GameType, memberIds: string[]) {
     if (!membership) return;
     setBusy(true);
     try {
       const names = new Map((family?.members ?? []).map((m) => [m.id, m.name]));
       const players = [membership.memberId, ...memberIds].map((id) => ({ id, name: names.get(id) ?? membership.name }));
-      const state = getGame().createGame(players, Math.floor(Math.random() * 2 ** 31));
+      const state = GAMES[gameType].create(players, Math.floor(Math.random() * 2 ** 31));
       const id = await getBackend().createGame(membership.code, state);
       setView({ kind: "game", id });
     } catch (e) {
@@ -136,7 +144,7 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
     }
   }
 
-  async function submit(g: OnlineGame, next: WoerterState) {
+  async function submit(g: OnlineGame, next: AnyState) {
     if (!membership) return;
     setBusy(true);
     try {
@@ -167,7 +175,15 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
           else if (res === "nichts" && typeof navigator !== "undefined" && !navigator.share)
             setNotice("Bitte kopiere den Link unter dem Familiencode und schicke ihn weiter.");
         }}
-        champions={stats ? stats.ranking.filter((r) => r.rank === 1).map((r) => r.name) : []}
+        champions={
+          stats
+            ? GAME_LIST.filter((g) => stats[g.type].finishedGames > 0).map((g) => ({
+                title: g.title,
+                icon: g.icon,
+                names: stats[g.type].ranking.filter((r) => r.rank === 1).map((r) => r.name),
+              }))
+            : []
+        }
         onBack={onExit}
         onLeave={() => setConfirmLeave(true)}
       />
@@ -175,8 +191,7 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
   } else if (view.kind === "stats") {
     content = (
       <StatsScreen
-        ranking={stats?.ranking ?? null}
-        records={stats?.records ?? null}
+        stats={stats}
         meId={membership.memberId}
         onBack={() => setView({ kind: "home" })}
       />
@@ -215,6 +230,17 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
         onMenu={() => setView({ kind: "home" })}
       />
     );
+  } else if (game.state.game === "zahlenromme") {
+    content = (
+      <RommeScreen
+        state={game.state as RommeState}
+        viewerId={membership.memberId}
+        onlineIds={onlineIds}
+        busy={busy}
+        onMove={(next) => void submit(game, next)}
+        onMenu={() => setView({ kind: "home" })}
+      />
+    );
   } else if (game.state.wordRequest && game.state.wordRequest.votes[membership.memberId] === null) {
     // Ich soll über ein Wort entscheiden
     content = (
@@ -224,7 +250,7 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
         busy={busy}
         menuLabel="Zu meinen Partien"
         onVote={(accept) =>
-          void submit(game, getGame().applyMove(game.state, membership.memberId, { type: "abstimmen", accept }))
+          void submit(game, getGame().applyMove(game.state as WoerterState, membership.memberId, { type: "abstimmen", accept }))
         }
         onMenu={() => setView({ kind: "home" })}
       />
@@ -232,7 +258,7 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
   } else {
     content = (
       <GameScreen
-        state={game.state}
+        state={game.state as WoerterState}
         viewerId={membership.memberId}
         onlineIds={onlineIds}
         busy={busy}

@@ -1,0 +1,12 @@
+{
+  "name": "@spielestube/zahlenromme",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zahlen-Rommé – Legespiel mit Zahlensteinen für Sigrids Spielestube (Regeln, Prüfung, Wertung)",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@spielestube/core": "0.1.0"
+  }
+}

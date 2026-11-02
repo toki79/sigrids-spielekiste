@@ -1,4 +1,4 @@
-import type { WoerterState } from "@spielestube/woerterei";
+import type { AnyState, GameType } from "../games/registry";
 
 /** Ein Familienmitglied. `id` bleibt gleich, auch wenn jemand ein neues Gerät nimmt. */
 export interface Member {
@@ -17,13 +17,14 @@ export interface Family {
 export interface OnlineGame {
   id: string;
   familyCode: string;
+  gameType: GameType;
   playerIds: string[];
   /** Wer ist dran (Mitglieds-ID), `null` wenn beendet. */
   turnId: string | null;
   status: "laeuft" | "beendet";
   moveCount: number;
   updatedAt: number;
-  state: WoerterState;
+  state: AnyState;
 }
 
 export type Unsubscribe = () => void;
@@ -46,19 +47,20 @@ export interface OnlineBackend {
   joinFamily(code: string, as: { memberId: string } | { name: string }): Promise<string>;
   watchFamily(code: string, onChange: (family: Family | null) => void): Unsubscribe;
   touchPresence(code: string, memberId: string): Promise<void>;
-  createGame(code: string, state: WoerterState): Promise<string>;
+  createGame(code: string, state: AnyState): Promise<string>;
   watchGames(code: string, memberId: string, onChange: (games: OnlineGame[]) => void): Unsubscribe;
   /** Alle Partien der Familie (für Statistik und Rangliste). */
   watchFamilyGames(code: string, onChange: (games: OnlineGame[]) => void): Unsubscribe;
   watchGame(code: string, gameId: string, onChange: (game: OnlineGame | null) => void): Unsubscribe;
   /** Zug speichern – nur wenn die Partie noch beim erwarteten Stand ist. */
-  submitMove(code: string, gameId: string, expectedMoveCount: number, next: WoerterState): Promise<SubmitResult>;
+  submitMove(code: string, gameId: string, expectedMoveCount: number, next: AnyState): Promise<SubmitResult>;
   deleteGame(code: string, gameId: string): Promise<void>;
 }
 
 /** Felder, die zusätzlich zum Spielzustand gespeichert werden (für Listen und Abfragen). */
-export function gameFields(state: WoerterState) {
+export function gameFields(state: AnyState) {
   return {
+    gameType: state.game,
     playerIds: state.players.map((p) => p.id),
     turnId: state.status === "laeuft" ? (state.players[state.turn]?.id ?? null) : null,
     status: state.status,

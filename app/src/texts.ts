@@ -1,6 +1,6 @@
 import type { HistoryEntry, WoerterState } from "@spielestube/woerterei";
 
-export function playerName(state: WoerterState, id: string): string {
+export function playerName(state: { players: readonly { id: string; name: string }[] }, id: string): string {
   return state.players.find((p) => p.id === id)?.name ?? "Jemand";
 }
 

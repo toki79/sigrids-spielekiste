@@ -1,12 +1,12 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { result, type WoerterState } from "@spielestube/woerterei";
+import { gameOf, standings, type AnyState } from "../games/registry";
 import { BigButton } from "../components/BigButton";
 import { Confetti } from "../components/Confetti";
 import { playerName, points } from "../texts";
 import { colors, font, radius, space } from "../theme";
 
 interface Props {
-  state: WoerterState;
+  state: AnyState;
   onNewGame: () => void;
   onMenu: () => void;
   newGameLabel?: string;
@@ -14,7 +14,8 @@ interface Props {
 }
 
 export function EndScreen({ state, onNewGame, onMenu, newGameLabel = "Neue Partie", menuLabel = "Zum Hauptmenü" }: Props) {
-  const res = result(state);
+  const res = standings(state);
+  const info = gameOf(state);
   const end = state.history.at(-1);
   const winners = res.winners.map((id) => playerName(state, id));
   return (
@@ -26,9 +27,11 @@ export function EndScreen({ state, onNewGame, onMenu, newGameLabel = "Neue Parti
       </Text>
       <Text style={styles.text}>
         {state.endReason === "ausgespielt"
-          ? "Alle Buchstaben sind aufgebraucht."
+          ? state.game === "zahlenromme"
+            ? `${winners[0]} hat alle Steine abgelegt.`
+            : "Alle Buchstaben sind aufgebraucht."
           : "Keiner konnte mehr legen."}{" "}
-        Die übrigen Buchstaben wurden verrechnet.
+        Die übrigen {state.game === "zahlenromme" ? "Steine" : "Buchstaben"} wurden verrechnet.
       </Text>
 
       <View style={styles.table}>
@@ -40,7 +43,7 @@ export function EndScreen({ state, onNewGame, onMenu, newGameLabel = "Neue Parti
               <Text style={styles.name}>{playerName(state, s.playerId)}</Text>
               <View style={styles.scoreCol}>
                 <Text style={styles.score}>{points(s.score)}</Text>
-                {adj !== 0 && <Text style={styles.adj}>({adj > 0 ? "+" : ""}{points(adj)} Restbuchstaben)</Text>}
+                {adj !== 0 && <Text style={styles.adj}>({adj > 0 ? "+" : ""}{points(adj)} {info.restLabel})</Text>}
               </View>
             </View>
           );

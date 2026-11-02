@@ -1,22 +1,26 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import type { FamilyRecords, MemberStats } from "@spielestube/woerterei";
+import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { BigButton } from "../../components/BigButton";
 import { Confetti } from "../../components/Confetti";
-import { points } from "../../texts";
+import { GAME_LIST, GAMES, type GameStats, type GameType } from "../../games/registry";
 import { colors, font, radius, space } from "../../theme";
 
 interface Props {
-  ranking: MemberStats[] | null;
-  records: FamilyRecords | null;
+  stats: Record<GameType, GameStats> | null;
   meId: string;
   onBack: () => void;
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-/** Rangliste der Familie – die Nummer 1 wird gefeiert. */
-export function StatsScreen({ ranking, records, meId, onBack }: Props) {
-  if (!ranking || !records) {
+/** Rangliste der Familie je Spiel – die Nummer 1 wird gefeiert. */
+export function StatsScreen({ stats, meId, onBack }: Props) {
+  // Mit dem Spiel beginnen, in dem schon am meisten gespielt wurde
+  const [type, setType] = useState<GameType>(() =>
+    stats ? [...GAME_LIST].sort((a, b) => (stats[b.type]?.finishedGames ?? 0) - (stats[a.type]?.finishedGames ?? 0))[0]!.type : "woerterei",
+  );
+
+  if (!stats) {
     return (
       <View style={styles.center}>
         <Text style={styles.text}>Die Rangliste wird geladen …</Text>
@@ -24,6 +28,7 @@ export function StatsScreen({ ranking, records, meId, onBack }: Props) {
     );
   }
 
+  const { ranking, records } = stats[type];
   const champions = ranking.filter((r) => r.rank === 1);
   const champ = champions[0];
 
@@ -34,17 +39,37 @@ export function StatsScreen({ ranking, records, meId, onBack }: Props) {
           Rangliste der Familie
         </Text>
 
+        <View style={styles.tabs}>
+          {GAME_LIST.map((g) => (
+            <Pressable
+              key={g.type}
+              onPress={() => setType(g.type)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: g.type === type }}
+              style={[styles.tab, g.type === type && styles.tabActive]}
+              testID={`tab-${g.type}`}
+            >
+              <Text style={[styles.tabText, g.type === type && styles.tabTextActive]}>
+                {g.icon} {g.title}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         {!champ ? (
-          <Text style={styles.text}>Noch ist keine Partie zu Ende gespielt. Sobald die erste Partie vorbei ist, erscheint hier die Rangliste.</Text>
+          <Text style={styles.text}>
+            In {GAMES[type].title} ist noch keine Partie zu Ende gespielt. Sobald die erste Partie vorbei ist, erscheint hier die Rangliste.
+          </Text>
         ) : (
           <>
             <View style={styles.champ} testID="champion">
               <Text style={styles.crown}>👑</Text>
-              <Text style={styles.champLabel}>{champions.length > 1 ? "Unsere Familien-Champions" : "Unser Familien-Champion"}</Text>
+              <Text style={styles.champLabel}>
+                {champions.length > 1 ? "Unsere Champions" : "Unser Champion"} in {GAMES[type].title}
+              </Text>
               <Text style={styles.champName}>{champions.map((c) => c.name).join(" & ")}</Text>
               <Text style={styles.champText}>
                 {champ.wins} {champ.wins === 1 ? "Sieg" : "Siege"} aus {champ.games} {champ.games === 1 ? "Partie" : "Partien"}
-                {champ.bestMove ? ` · bester Zug: ${champ.bestMove.word} (${points(champ.bestMove.score)})` : ""}
               </Text>
               <Text style={styles.cheer}>Herzlichen Glückwunsch! 🎉</Text>
             </View>
@@ -69,24 +94,19 @@ export function StatsScreen({ ranking, records, meId, onBack }: Props) {
 
             <Text style={styles.section}>Rekorde</Text>
             <View style={styles.records}>
-              {records.bestMove && (
-                <Text style={styles.record}>
-                  🏆 Bester Zug: <Text style={styles.bold}>{records.bestMove.name}</Text> mit {records.bestMove.word} – {points(records.bestMove.score)}
+              {records.map((rec) => (
+                <Text key={rec.label} style={styles.record}>
+                  {rec.icon} {rec.label}: {rec.name ? <Text style={styles.bold}>{rec.name} </Text> : null}
+                  {rec.text}
                 </Text>
-              )}
-              {records.bestGame && (
-                <Text style={styles.record}>
-                  ⭐ Höchste Punktzahl in einer Partie: <Text style={styles.bold}>{records.bestGame.name}</Text> mit {points(records.bestGame.score)}
-                </Text>
-              )}
-              <Text style={styles.record}>🎲 Beendete Partien insgesamt: {records.finishedGames}</Text>
+              ))}
             </View>
           </>
         )}
 
         <BigButton label="Zurück zu meinen Partien" variant="secondary" onPress={onBack} />
       </ScrollView>
-      {champ && <Confetti />}
+      {champ && <Confetti key={type} />}
     </View>
   );
 }
@@ -96,31 +116,19 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl },
   title: { fontSize: font.title, fontWeight: "800", color: colors.text },
   text: { fontSize: font.body, color: colors.text, lineHeight: font.body * 1.4 },
-  champ: {
-    alignItems: "center",
-    backgroundColor: "#FFF4D6",
-    borderColor: "#E0B84D",
-    borderWidth: 3,
-    borderRadius: radius * 1.5,
-    padding: space.xl,
-    gap: 4,
-  },
+  tabs: { flexDirection: "row", gap: space.s, flexWrap: "wrap" },
+  tab: { flexGrow: 1, borderWidth: 2, borderColor: colors.primary, borderRadius: radius, paddingVertical: space.s, paddingHorizontal: space.m, alignItems: "center", minHeight: 52, justifyContent: "center" },
+  tabActive: { backgroundColor: colors.primary },
+  tabText: { fontSize: font.body, fontWeight: "700", color: colors.primary },
+  tabTextActive: { color: "#FFFFFF" },
+  champ: { alignItems: "center", backgroundColor: "#FFF4D6", borderColor: "#E0B84D", borderWidth: 3, borderRadius: radius * 1.5, padding: space.xl, gap: 4 },
   crown: { fontSize: 64 },
-  champLabel: { fontSize: font.body, color: colors.textMuted, fontWeight: "700" },
+  champLabel: { fontSize: font.body, color: colors.textMuted, fontWeight: "700", textAlign: "center" },
   champName: { fontSize: 40, fontWeight: "900", color: colors.text, textAlign: "center" },
   champText: { fontSize: font.body, color: colors.text, textAlign: "center" },
   cheer: { fontSize: font.large, fontWeight: "800", color: colors.success, marginTop: space.s },
   table: { gap: space.s, marginTop: space.m },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.m,
-    backgroundColor: colors.surface,
-    borderRadius: radius,
-    borderWidth: 2,
-    borderColor: colors.border,
-    padding: space.m,
-  },
+  row: { flexDirection: "row", alignItems: "center", gap: space.m, backgroundColor: colors.surface, borderRadius: radius, borderWidth: 2, borderColor: colors.border, padding: space.m },
   rowFirst: { borderColor: "#E0B84D", backgroundColor: "#FFFBEF" },
   rowMe: { borderWidth: 3 },
   rank: { fontSize: font.title, width: 44, textAlign: "center", fontWeight: "800", color: colors.text },

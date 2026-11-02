@@ -1,7 +1,8 @@
 # Sigrids Spielestube
 
 Seniorengerechte Familienspiele für Android-Tablets und -Handys – am selben
-Gerät oder online gegeneinander. Erstes Spiel: **Wörterei**, ein Wortlegespiel.
+Gerät oder online gegeneinander. Spiele: **Wörterei** (Wortlegespiel) und
+**Zahlen-Rommé** (Legespiel mit Zahlensteinen).
 
 Das vollständige Konzept steht im claude.ai-Projekt „handygame“
 (`konzept-sigrids-spielestube.md`).
@@ -14,6 +15,7 @@ packages/
   core/        Gemeinsame Schnittstelle aller Spiele (GameModule), Zufall
   woerterei/   Wörterei: Brett, Steine, Zugprüfung, Wertung, Spielablauf
     data/      Wortliste (≈300.000 Wörter, igerman98, GPL)
+  zahlenromme/ Zahlen-Rommé: Steine, Reihen prüfen, erstes Auslegen, Umlegen, Wertung
 scripts/       Werkzeuge, z. B. Aufbereitung der Wortliste
 ```
 
@@ -94,6 +96,18 @@ wie eine App ablegen).
 - Fehlt ein Wort im Wörterbuch, kann der Spieler die anderen fragen: Stimmen alle zu, wird
   der Zug gelegt; sagt jemand Nein, ist der Spieler noch einmal dran
 - Rangliste der Familie (Siege, Ø Punkte, Rekorde) – die Nummer 1 wird mit Krone und Konfetti gefeiert
+
+## Zahlen-Rommé – Regeln in Kürze
+
+- 106 Steine: Zahlen 1–13 in Rot ●, Blau ■, Schwarz ▲, Orange ◆ (je doppelt) und 2 Joker; 14 Steine pro Spieler
+- Gruppe: 3–4 Steine mit gleicher Zahl in verschiedenen Farben; Folge: mind. 3 Steine einer Farbe der Reihe nach (13 → 1 geht nicht)
+- Erstes Auslegen: Reihen nur aus eigenen Steinen mit zusammen mindestens 30 Punkten
+- Danach darf der Tisch frei umgelegt werden – am Zugende müssen alle Reihen gültig sein,
+  Steine vom Tisch dürfen nicht auf die Bank
+- Wer nichts legen kann oder will, zieht einen Stein (leerer Vorrat: aussetzen)
+- Wer zuerst alle Steine ablegt, gewinnt und bekommt die Reststeine der anderen (Joker 30) gutgeschrieben;
+  setzen bei leerem Vorrat alle aus, gewinnt die kleinste Bank
+- Bedienung: Steine antippen und „Neue Reihe“ bzw. „Hierher“ wählen – oder ziehen; „Zurücksetzen“ stellt den Tisch wieder her
 
 ## Lizenzen
 

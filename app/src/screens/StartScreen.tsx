@@ -1,19 +1,19 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import type { WoerterState } from "@spielestube/woerterei";
 import { BigButton } from "../components/BigButton";
+import { GAME_LIST, type AnyState, type GameType } from "../games/registry";
 import { colors, font, radius, space } from "../theme";
 
 interface Props {
   /** Name, wenn dieses Gerät schon einer Familie beigetreten ist. */
   onlineName: string | null;
   onOnline: () => void;
-  savedGame: WoerterState | null;
-  onContinue: () => void;
-  onNewGame: () => void;
+  /** Laufende Partien am selben Gerät, je Spiel. */
+  saved: Partial<Record<GameType, AnyState | null>>;
+  onContinue: (type: GameType) => void;
+  onNewGame: (type: GameType) => void;
 }
 
-export function StartScreen({ onlineName, onOnline, savedGame, onContinue, onNewGame }: Props) {
-  const running = savedGame && savedGame.status === "laeuft";
+export function StartScreen({ onlineName, onOnline, saved, onContinue, onNewGame }: Props) {
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
       <Text style={styles.title} accessibilityRole="header">
@@ -22,9 +22,10 @@ export function StartScreen({ onlineName, onOnline, savedGame, onContinue, onNew
       <Text style={styles.subtitle}>Schön, dass du da bist!</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Wörterei – online</Text>
+        <Text style={styles.cardTitle}>Online mit der Familie</Text>
         <Text style={styles.cardText}>
-          Jeder spielt an seinem eigenen Handy oder Tablet. Die Züge der anderen erscheinen sofort.
+          Jeder spielt an seinem eigenen Handy oder Tablet – {GAME_LIST.map((g) => g.title).join(" oder ")}. Die Züge der anderen
+          erscheinen sofort.
         </Text>
         <BigButton
           label={onlineName ? `Meine Partien (${onlineName})` : "Online mit der Familie spielen"}
@@ -34,22 +35,28 @@ export function StartScreen({ onlineName, onOnline, savedGame, onContinue, onNew
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Wörterei – am selben Gerät</Text>
+        <Text style={styles.cardTitle}>Am selben Gerät</Text>
         <Text style={styles.cardText}>Für 2 bis 4 Spieler an einem Tisch. Das Tablet wird reihum weitergegeben.</Text>
-        {running ? (
-          <>
-            <Text style={styles.cardText}>
-              Es läuft noch eine Partie mit {savedGame.players.map((p) => p.name).join(", ")}.
-            </Text>
-            <BigButton label="Partie fortsetzen" variant="secondary" onPress={onContinue} testID="weiter" />
-            <BigButton label="Neue Partie beginnen" variant="secondary" onPress={onNewGame} testID="neu" />
-          </>
-        ) : (
-          <BigButton label="Neue Partie beginnen" variant="secondary" onPress={onNewGame} testID="neu" />
-        )}
+        {GAME_LIST.map((g) => {
+          const running = saved[g.type];
+          const active = running && running.status === "laeuft";
+          return (
+            <View key={g.type} style={styles.game}>
+              <Text style={styles.gameTitle}>
+                {g.icon} {g.title}
+              </Text>
+              <Text style={styles.gameText}>{g.description}</Text>
+              {active && (
+                <>
+                  <Text style={styles.gameText}>Es läuft noch eine Partie mit {running.players.map((p) => p.name).join(", ")}.</Text>
+                  <BigButton label="Partie fortsetzen" variant="secondary" onPress={() => onContinue(g.type)} testID={`weiter-${g.type}`} />
+                </>
+              )}
+              <BigButton label="Neue Partie" variant="secondary" onPress={() => onNewGame(g.type)} testID={`neu-${g.type}`} />
+            </View>
+          );
+        })}
       </View>
-
-      <Text style={styles.hint}>Weitere Spiele folgen.</Text>
     </ScrollView>
   );
 }
@@ -61,5 +68,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radius, borderWidth: 2, borderColor: colors.border, padding: space.xl, gap: space.m },
   cardTitle: { fontSize: font.title, fontWeight: "800", color: colors.text },
   cardText: { fontSize: font.body, color: colors.text, lineHeight: font.body * 1.4 },
-  hint: { fontSize: font.body, color: colors.textMuted, textAlign: "center" },
+  game: { gap: space.s, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.m },
+  gameTitle: { fontSize: font.large, fontWeight: "800", color: colors.text },
+  gameText: { fontSize: font.body, color: colors.textMuted, lineHeight: font.body * 1.35 },
 });
