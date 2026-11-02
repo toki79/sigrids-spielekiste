@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode, type RefObject } from "react";
+import { Animated, BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import {
   BOARD_SIZE,
   EMPTY,
@@ -14,7 +14,8 @@ import {
   type WoerterState,
 } from "@spielestube/woerterei";
 import { BigButton } from "../components/BigButton";
-import { Board, BoardLegend } from "../components/Board";
+import { Board, BoardLegend, boardGeometry } from "../components/Board";
+import { Draggable } from "../components/Draggable";
 import { Dialog } from "../components/Dialog";
 import { Scoreboard } from "../components/Scoreboard";
 import { Tile } from "../components/Tile";
@@ -121,24 +122,138 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
       return;
     }
     if (selected === null) {
-      setHint("Tippe zuerst unten einen Buchstaben auf deiner Bank an – dann das Feld.");
+      setHint("Tippe zuerst unten einen Buchstaben auf deiner Bank an – dann das Feld. Oder ziehe den Buchstaben aufs Brett.");
       return;
     }
-    const tile = rack[selected]!;
-    if (tile === JOKER) {
-      setJokerTarget({ row, col, rackIndex: selected });
-      return;
-    }
-    setPending((prev) => [...prev, { placement: { row, col, letter: tile }, rackIndex: selected }]);
-    setSelected(nextFreeIndex(selected));
-    setHint(null);
+    placeFromRack(selected, row, col);
   }
 
-  function nextFreeIndex(justUsed: number): number | null {
-    // Nach dem Legen nichts automatisch auswählen – das ist für ungeübte Spieler verständlicher.
-    void justUsed;
-    return null;
+  /** Stein von der Bank auf ein freies Feld legen (Joker: erst Buchstaben wählen). */
+  function placeFromRack(rackIndex: number, row: number, col: number) {
+    const tile = rack[rackIndex]!;
+    setSelected(null);
+    setHint(null);
+    if (tile === JOKER) {
+      setJokerTarget({ row, col, rackIndex });
+      return;
+    }
+    setPending((prev) => [...prev, { placement: { row, col, letter: tile }, rackIndex }]);
   }
+
+  // ---------- Ziehen (Drag & Drop) ----------
+
+  type DragSource = { kind: "rack"; index: number } | { kind: "board"; row: number; col: number };
+  interface Rect { x: number; y: number; w: number; h: number }
+
+  type ViewRef = ComponentRef<typeof View>;
+  const rootRef = useRef<ViewRef>(null);
+  const boardRef = useRef<ViewRef>(null);
+  const rackRef = useRef<ViewRef>(null);
+  const rects = useRef<{ root?: Rect; board?: Rect; rack?: Rect }>({});
+  const dragPos = useRef(new Animated.ValueXY()).current;
+  const hoverRef = useRef<number | null>(null);
+  const [drag, setDrag] = useState<{ source: DragSource; letter: string; joker: boolean } | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+
+  function measure(ref: RefObject<ViewRef | null>, key: "root" | "board" | "rack") {
+    ref.current?.measureInWindow((x, y, w, h) => {
+      rects.current[key] = { x, y, w, h };
+    });
+  }
+
+  /** Welches Brettfeld liegt unter dem Finger? Nur freie Felder zählen. */
+  function cellUnder(x: number, y: number, source: DragSource | null): number | null {
+    const b = rects.current.board;
+    if (!b) return null;
+    const { gap, cell } = boardGeometry(boardSize);
+    const col = Math.floor((x - b.x - gap / 2) / (cell + gap));
+    const row = Math.floor((y - b.y - gap / 2) / (cell + gap));
+    if (row < 0 || col < 0 || row >= BOARD_SIZE || col >= BOARD_SIZE) return null;
+    if (cellAt(state.board, row, col) !== EMPTY) return null;
+    const occupied = pending.some((p) => p.placement.row === row && p.placement.col === col);
+    const ownCell = source?.kind === "board" && source.row === row && source.col === col;
+    if (occupied && !ownCell) return null;
+    return row * BOARD_SIZE + col;
+  }
+
+  function overRack(x: number, y: number): boolean {
+    const r = rects.current.rack;
+    return !!r && x >= r.x && x <= r.x + r.w && y >= r.y - 20 && y <= r.y + r.h + 20;
+  }
+
+  function setFloat(x: number, y: number) {
+    const root = rects.current.root ?? { x: 0, y: 0 };
+    dragPos.setValue({ x: x - root.x - rackTile / 2, y: y - root.y - rackTile * 0.9 });
+  }
+
+  function startDrag(source: DragSource, letter: string, joker: boolean, x: number, y: number) {
+    measure(rootRef, "root");
+    measure(boardRef, "board");
+    measure(rackRef, "rack");
+    setHint(null);
+    setSelected(null);
+    setFloat(x, y);
+    setDrag({ source, letter, joker });
+  }
+
+  function moveDrag(x: number, y: number) {
+    setFloat(x, y);
+    const cell = cellUnder(x, y, drag?.source ?? null);
+    if (cell !== hoverRef.current) {
+      hoverRef.current = cell;
+      setHover(cell);
+    }
+  }
+
+  function endDrag(source: DragSource, x: number, y: number, completed: boolean) {
+    hoverRef.current = null;
+    setHover(null);
+    setDrag(null);
+    if (!completed) return;
+    const target = cellUnder(x, y, source);
+    if (target !== null) {
+      const row = Math.floor(target / BOARD_SIZE);
+      const col = target % BOARD_SIZE;
+      if (source.kind === "rack") {
+        placeFromRack(source.index, row, col);
+      } else if (source.row !== row || source.col !== col) {
+        // Neu gelegten Stein auf ein anderes Feld verschieben
+        setPending((prev) =>
+          prev.map((p) =>
+            p.placement.row === source.row && p.placement.col === source.col ? { ...p, placement: { ...p.placement, row, col } } : p,
+          ),
+        );
+      }
+      return;
+    }
+    if (source.kind === "board" && overRack(x, y)) {
+      // Zurück auf die Bank
+      setPending((prev) => prev.filter((p) => !(p.placement.row === source.row && p.placement.col === source.col)));
+    }
+  }
+
+  // Neu gelegte Steine auf dem Brett lassen sich ebenfalls ziehen
+  const wrapPending = useCallback(
+    (p: Placement, tile: ReactNode) => {
+      const source: DragSource = { kind: "board", row: p.row, col: p.col };
+      const dragging = drag?.source.kind === "board" && drag.source.row === p.row && drag.source.col === p.col;
+      return (
+        <Draggable
+          onTap={() => {
+            setPending((prev) => prev.filter((q) => !(q.placement.row === p.row && q.placement.col === p.col)));
+            setHint(null);
+          }}
+          onStart={(x, y) => startDrag(source, p.letter, !!p.joker, x, y)}
+          onMove={moveDrag}
+          onEnd={(x, y, ok) => endDrag(source, x, y, ok)}
+        >
+          <View style={dragging ? styles.ghost : undefined}>{tile}</View>
+        </Draggable>
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [drag, pending, state.board],
+  );
 
   function chooseJokerLetter(letter: string) {
     if (!jokerTarget) return;
@@ -218,21 +333,30 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
         <Text style={styles.statusText}>{status.text}</Text>
       </View>
 
-      <View style={styles.rack} accessibilityLabel="Deine Buchstaben">
+      <View ref={rackRef} style={styles.rack} accessibilityLabel="Deine Buchstaben">
         {rack.map((t, i) =>
           usedIdx.has(i) ? (
             <View key={i} style={[styles.rackGap, { width: rackTile, height: rackTile, borderRadius: rackTile * 0.12 }]} />
           ) : (
-            <Pressable
+            <Draggable
               key={i}
-              onPress={() => onRackPress(i)}
-              accessibilityRole="button"
+              dragDisabled={mode !== "legen"}
+              onTap={() => onRackPress(i)}
+              onStart={(x, y) => startDrag({ kind: "rack", index: i }, t, t === JOKER, x, y)}
+              onMove={moveDrag}
+              onEnd={(x, y, ok) => endDrag({ kind: "rack", index: i }, x, y, ok)}
               accessibilityLabel={t === JOKER ? "Joker" : `Buchstabe ${t}`}
-              accessibilityState={{ selected: selected === i || exchange.has(i) }}
-              style={[(selected === i || exchange.has(i)) && styles.lifted]}
+              selected={selected === i || exchange.has(i)}
             >
-              <Tile letter={t} joker={t === JOKER} size={rackTile} selected={selected === i || exchange.has(i)} />
-            </Pressable>
+              <View
+                style={[
+                  (selected === i || exchange.has(i)) && styles.lifted,
+                  drag?.source.kind === "rack" && drag.source.index === i && styles.ghost,
+                ]}
+              >
+                <Tile letter={t} joker={t === JOKER} size={rackTile} selected={selected === i || exchange.has(i)} />
+              </View>
+            </Draggable>
           ),
         )}
       </View>
@@ -292,14 +416,30 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
 
   return (
     <>
-      <ScrollView contentContainerStyle={[styles.wrap, landscape && styles.wrapLandscape]}>
+      <View ref={rootRef} style={styles.root}>
+      <ScrollView scrollEnabled={!drag} contentContainerStyle={[styles.wrap, landscape && styles.wrapLandscape]}>
         {!landscape && <Text style={styles.turnTitle}>{player.name} ist dran</Text>}
         <View>
-          <Board board={state.board} pending={placements} lastMove={lastMoveCells} size={boardSize} onCellPress={onCellPress} />
+          <Board
+            ref={boardRef}
+            board={state.board}
+            pending={placements}
+            lastMove={lastMoveCells}
+            size={boardSize}
+            onCellPress={onCellPress}
+            hover={hover}
+            wrapPending={wrapPending}
+          />
           <BoardLegend />
         </View>
         {panel}
       </ScrollView>
+      {drag && (
+        <Animated.View pointerEvents="none" style={[styles.float, { transform: dragPos.getTranslateTransform() }]}>
+          <Tile letter={drag.letter} joker={drag.joker} size={rackTile} fresh />
+        </Animated.View>
+      )}
+      </View>
 
       <Dialog
         visible={jokerTarget !== null}
@@ -353,6 +493,9 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
+  float: { position: "absolute", left: 0, top: 0, opacity: 0.92, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 6, elevation: 6 },
+  ghost: { opacity: 0.25 },
   wrap: { padding: 6, paddingBottom: space.xl, gap: space.m, alignItems: "center" },
   wrapLandscape: { flexDirection: "row", alignItems: "flex-start", justifyContent: "center", padding: 12, gap: 18 },
   turnTitle: { fontSize: font.title, fontWeight: "800", color: colors.primary, textAlign: "center" },

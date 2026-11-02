@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type ComponentRef, type ReactNode, type Ref } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BOARD_SIZE, EMPTY, cellAt, isJokerCell, premiumAt, type Placement, type Premium } from "@spielestube/woerterei";
 import { colors } from "../theme";
@@ -11,6 +11,18 @@ interface Props {
   lastMove?: ReadonlySet<number>;
   size: number;
   onCellPress?: (row: number, col: number) => void;
+  /** Feld, über dem gerade ein Stein gezogen wird (row * 15 + col). */
+  hover?: number | null;
+  /** Hülle für neu gelegte Steine (z. B. damit man sie ziehen kann). */
+  wrapPending?: (p: Placement, tile: ReactNode) => ReactNode;
+  ref?: Ref<ComponentRef<typeof View>>;
+}
+
+/** Maße des Bretts: Abstand zwischen Feldern, Feldgröße, Gesamtgröße. */
+export function boardGeometry(size: number) {
+  const gap = size >= 500 ? 2 : 1;
+  const cell = Math.floor((size - gap * (BOARD_SIZE + 1)) / BOARD_SIZE);
+  return { gap, cell, total: cell * BOARD_SIZE + gap * (BOARD_SIZE + 1) };
 }
 
 const PREMIUM_STYLE: Record<Premium, { bg: string; fg: string; short: string; long: string }> = {
@@ -21,10 +33,8 @@ const PREMIUM_STYLE: Record<Premium, { bg: string; fg: string; short: string; lo
   START: { bg: colors.w2, fg: colors.w2Text, short: "★", long: "★" },
 };
 
-export const Board = memo(function Board({ board, pending, lastMove, size, onCellPress }: Props) {
-  const gap = size >= 500 ? 2 : 1;
-  const cell = Math.floor((size - gap * (BOARD_SIZE + 1)) / BOARD_SIZE);
-  const total = cell * BOARD_SIZE + gap * (BOARD_SIZE + 1);
+export const Board = memo(function Board({ board, pending, lastMove, size, onCellPress, hover, wrapPending, ref }: Props) {
+  const { gap, cell, total } = boardGeometry(size);
   const pendingMap = new Map(pending.map((p) => [p.row * BOARD_SIZE + p.col, p]));
   const rows = [];
 
@@ -37,7 +47,8 @@ export const Board = memo(function Board({ board, pending, lastMove, size, onCel
       let content;
       let label = "";
       if (p) {
-        content = <Tile letter={p.letter} joker={p.joker} size={cell} fresh />;
+        const tile = <Tile letter={p.letter} joker={p.joker} size={cell} fresh />;
+        content = wrapPending ? wrapPending(p, tile) : tile;
         label = `${p.letter}, neu gelegt, antippen zum Zurücknehmen`;
       } else if (ch !== EMPTY) {
         const joker = isJokerCell(ch);
@@ -52,7 +63,13 @@ export const Board = memo(function Board({ board, pending, lastMove, size, onCel
         const st = prem ? PREMIUM_STYLE[prem] : null;
         const text = st ? (cell >= 44 && prem !== "START" ? st.long : st.short) : "";
         content = (
-          <View style={[styles.empty, { width: cell, height: cell, backgroundColor: st?.bg ?? colors.cell, borderRadius: Math.max(2, cell * 0.08) }]}>
+          <View
+            style={[
+              styles.empty,
+              { width: cell, height: cell, backgroundColor: st?.bg ?? colors.cell, borderRadius: Math.max(2, cell * 0.08) },
+              hover === key && { borderWidth: Math.max(2, Math.round(cell * 0.1)), borderColor: colors.primary },
+            ]}
+          >
             {st ? (
               <Text
                 allowFontScaling={false}
@@ -89,7 +106,11 @@ export const Board = memo(function Board({ board, pending, lastMove, size, onCel
     );
   }
 
-  return <View style={[styles.board, { width: total, height: total }]}>{rows}</View>;
+  return (
+    <View ref={ref} style={[styles.board, { width: total, height: total }]}>
+      {rows}
+    </View>
+  );
 });
 
 const styles = StyleSheet.create({

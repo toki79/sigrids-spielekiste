@@ -57,7 +57,8 @@ wie eine App ablegen).
 
 - Namen eintragen (2–4 Spieler), Partie starten
 - Übergabe-Bildschirm: „Ich bin … – Buchstaben zeigen“ (die Bank bleibt bis dahin verdeckt)
-- Buchstaben auf der Bank antippen, dann das Feld antippen; neu gelegte Steine durch Antippen zurücknehmen
+- Buchstaben aufs Brett ziehen – oder antippen und dann das Feld antippen
+- Neu gelegte Steine lassen sich verschieben, zurück auf die Bank ziehen oder durch Antippen zurücknehmen
 - Vorschau zeigt Wörter und Punkte, Fehler werden verständlich erklärt
 - Joker: Buchstaben im Auswahlfenster wählen
 - Tauschen, Aussetzen, Mischen; „Wort trotzdem gelten lassen“ mit Zustimmung aller
