@@ -30,7 +30,7 @@ import { generateFamilyCode, normalizeFamilyCode } from "@spielestube/core";
 import type { AnyState } from "../games/registry";
 import { createAuth } from "./firebaseAuth";
 import { firebaseConfig } from "./firebaseConfig";
-import { gameFields, newId, type Family, type OnlineBackend, type OnlineGame } from "./types";
+import { gameFields, newId, type Family, type GameDraft, type OnlineBackend, type OnlineGame } from "./types";
 
 function toFamily(code: string, data: DocumentData | undefined): Family | null {
   if (!data) return null;
@@ -57,6 +57,7 @@ function toGame(code: string, id: string, data: DocumentData | undefined): Onlin
       moveCount: data.moveCount ?? state.moveCount,
       updatedAt: data.updatedAt ?? 0,
       state,
+      draft: typeof data.draftJson === "string" ? (JSON.parse(data.draftJson) as GameDraft) : null,
     };
   } catch {
     return null;
@@ -210,8 +211,15 @@ export class FirebaseBackend implements OnlineBackend {
     return runTransaction(this.db, async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists() || snap.data().moveCount !== expectedMoveCount) return "conflict" as const;
-      tx.update(ref, { ...gameFields(next), stateJson: JSON.stringify(next), updatedAt: Date.now() });
+      tx.update(ref, { ...gameFields(next), stateJson: JSON.stringify(next), draftJson: null, updatedAt: Date.now() });
       return "ok" as const;
+    });
+  }
+
+  async updateDraft(code: string, gameId: string, draft: GameDraft | null): Promise<void> {
+    // Nur das Entwurfsfeld – updatedAt bleibt, damit die Partienliste nicht ständig umsortiert wird.
+    await updateDoc(doc(this.db, "families", normalizeFamilyCode(code), "games", gameId), {
+      draftJson: draft ? JSON.stringify(draft) : null,
     });
   }
 

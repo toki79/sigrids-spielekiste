@@ -25,6 +25,17 @@ export interface OnlineGame {
   moveCount: number;
   updatedAt: number;
   state: AnyState;
+  /** Live-Entwurf des Spielers am Zug (nur Zahlen-Rommé): so sehen die anderen seine Versuche. */
+  draft?: GameDraft | null;
+}
+
+export interface GameDraft {
+  /** Wer probiert gerade (Mitglieds-ID)? */
+  by: string;
+  /** Zu welchem Spielstand gehört der Entwurf? Ältere Entwürfe werden ignoriert. */
+  moveCount: number;
+  /** Aktuelle Tischbelegung des Versuchs. */
+  table: number[][];
 }
 
 export type Unsubscribe = () => void;
@@ -54,6 +65,8 @@ export interface OnlineBackend {
   watchGame(code: string, gameId: string, onChange: (game: OnlineGame | null) => void): Unsubscribe;
   /** Zug speichern – nur wenn die Partie noch beim erwarteten Stand ist. */
   submitMove(code: string, gameId: string, expectedMoveCount: number, next: AnyState): Promise<SubmitResult>;
+  /** Live-Entwurf schreiben (null = löschen). Darf häufig aufgerufen werden – Aufrufer drosselt. */
+  updateDraft(code: string, gameId: string, draft: GameDraft | null): Promise<void>;
   deleteGame(code: string, gameId: string): Promise<void>;
 }
 

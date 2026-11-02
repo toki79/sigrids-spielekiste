@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { BigButton } from "../../components/BigButton";
+import { GameIcon } from "../../components/GameIcon";
 import { GAME_LIST, GAMES, type GameType } from "../../games/registry";
 import type { Membership } from "../../online/session";
 import { isOnline, lastSeenText, type Family } from "../../online/types";
@@ -37,7 +38,7 @@ export function NewOnlineGameScreen({ membership, family, busy, onStart, onBack 
             style={({ pressed }) => [styles.gameCard, pressed && { opacity: 0.85 }]}
             testID={`spiel-${g.type}`}
           >
-            <Text style={styles.gameIcon}>{g.icon}</Text>
+            <GameIcon type={g.type} size={80} />
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{g.title}</Text>
               <Text style={styles.seen}>{g.description}</Text>

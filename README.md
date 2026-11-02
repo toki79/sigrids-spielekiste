@@ -108,6 +108,7 @@ wie eine App ablegen).
 - Wer zuerst alle Steine ablegt, gewinnt und bekommt die Reststeine der anderen (Joker 30) gutgeschrieben;
   setzen bei leerem Vorrat alle aus, gewinnt die kleinste Bank
 - Bedienung: Steine antippen und „Neue Reihe“ bzw. „Hierher“ wählen – oder ziehen; „Zurücksetzen“ stellt den Tisch wieder her
+- Online sehen die Mitspieler die Versuche des Spielers am Zug live mit („● LIVE“)
 
 ## Lizenzen
 

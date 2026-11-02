@@ -34,10 +34,10 @@ export function RommeTile({ id, size, selected, fresh, locked, jokerValue }: Pro
         locked && styles.locked,
       ]}
     >
-      <Text allowFontScaling={false} style={[styles.number, { fontSize: size * (t.joker ? 0.6 : t.n >= 10 ? 0.52 : 0.62), color }, selected && styles.selectedText]}>
+      <Text allowFontScaling={false} style={[styles.number, { fontSize: size * (t.joker ? 0.6 : t.n >= 10 ? 0.52 : 0.62), lineHeight: size * 0.72, color }, selected && styles.selectedText]}>
         {t.joker ? "☺" : t.n}
       </Text>
-      <Text allowFontScaling={false} style={[styles.symbol, { fontSize: size * 0.26, color }, selected && styles.selectedText]}>
+      <Text allowFontScaling={false} style={[styles.symbol, { fontSize: size * 0.26, lineHeight: size * 0.32, color }, selected && styles.selectedText]}>
         {t.joker ? (jokerValue ? String(jokerValue) : "Joker") : ROMME_SYMBOLS[t.color as 0]}
       </Text>
     </View>
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   fresh: { backgroundColor: colors.tileNew, borderColor: colors.tileNewBorder },
   selected: { backgroundColor: colors.primary, borderColor: colors.primary, transform: [{ translateY: -4 }] },
   locked: { opacity: 0.85 },
-  number: { fontWeight: "900", lineHeight: undefined },
-  symbol: { fontWeight: "700", marginTop: -2 },
+  number: { fontWeight: "900", textAlign: "center" },
+  symbol: { fontWeight: "700", textAlign: "center" },
   selectedText: { color: "#FFFFFF" },
 });

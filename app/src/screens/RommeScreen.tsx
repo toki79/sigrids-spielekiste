@@ -25,6 +25,10 @@ interface Props {
   viewerId?: string;
   onlineIds?: ReadonlySet<string>;
   busy?: boolean;
+  /** Online: aktueller Versuch des Spielers am Zug (zum Mitverfolgen). */
+  liveDraft?: TileId[][] | null;
+  /** Online: eigener Versuch hat sich geändert (null = nichts verändert). */
+  onDraftChange?: (table: TileId[][] | null) => void;
 }
 
 const spiel = createZahlenromme();
@@ -33,7 +37,7 @@ interface Rect { x: number; y: number; w: number; h: number }
 type DropTarget = { kind: "set"; index: number } | { kind: "neu" } | { kind: "bank" } | null;
 
 /** Spielbildschirm Zahlen-Rommé: Tisch mit Reihen, eigene Bank, Antippen oder Ziehen. */
-export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }: Props) {
+export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy, liveDraft, onDraftChange }: Props) {
   const { width, height } = useWindowDimensions();
   const current = state.players[state.turn]!;
   const me = (viewerId && state.players.find((p) => p.id === viewerId)) || current;
@@ -71,6 +75,28 @@ export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }
   const playedNow = (id: TileId) => ownTiles.has(id) && tableTiles.has(id);
   /** Darf dieser Stein bewegt werden? Vor dem ersten Auslegen nur eigene Steine. */
   const movable = (id: TileId) => myTurn && (!tableTiles.has(id) || me.melded || playedNow(id));
+
+  // Eigene Versuche live an die anderen schicken
+  const draftSent = useRef(false);
+  useEffect(() => {
+    if (!myTurn || !onDraftChange) return;
+    if (changed) {
+      onDraftChange(table);
+      draftSent.current = true;
+    } else if (draftSent.current) {
+      onDraftChange(null); // zurückgesetzt
+      draftSent.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table, myTurn]);
+  useEffect(() => {
+    draftSent.current = false;
+  }, [state.moveCount]);
+
+  // Zuschauer: Versuch des Spielers am Zug anzeigen
+  const watching = !myTurn && !!liveDraft;
+  const shownTable = watching ? liveDraft! : table;
+  const committed = useMemo(() => new Set(state.table.flat()), [state.table]);
 
   const check = useMemo(() => (changed && myTurn ? checkMove(state, me.id, { type: "legen", table }) : null), [state, me.id, table, changed, myTurn]);
   const meldValue = useMemo(() => {
@@ -240,7 +266,9 @@ export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }
 
   let status: { text: string; kind: "info" | "ok" | "error" };
   if (hint) status = { text: hint, kind: "error" };
-  else if (!myTurn) {
+  else if (watching) {
+    status = { text: `${current.name} probiert gerade … Du siehst live mit, was ${current.name} auf dem Tisch verschiebt.`, kind: "info" };
+  } else if (!myTurn) {
     const last = info.describeLast(state);
     status = { text: `${last ? `${last}\n` : ""}Jetzt ist ${current.name} dran.`, kind: "info" };
   } else if (check && !check.ok) status = { text: check.message, kind: "error" };
@@ -262,7 +290,14 @@ export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }
     <View ref={rootRef} style={styles.root}>
       {/* Kopf: wer ist dran, Spieler, Vorrat */}
       <View style={styles.head}>
-        <Text style={[styles.title, !myTurn && styles.waitTitle]}>{title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, !myTurn && styles.waitTitle]}>{title}</Text>
+          {watching && (
+            <View style={styles.live} testID="live">
+              <Text style={styles.liveText}>● LIVE</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.players}>
           {state.players.map((p, i) => (
             <View key={p.id} style={[styles.player, i === state.turn && styles.playerActive]}>
@@ -280,8 +315,8 @@ export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }
 
       {/* Tisch */}
       <ScrollView style={styles.tableScroll} contentContainerStyle={styles.table} scrollEnabled={!drag}>
-        {table.length === 0 && <Text style={styles.empty}>Der Tisch ist noch leer.</Text>}
-        {table.map((set, i) => {
+        {shownTable.length === 0 && <Text style={styles.empty}>Der Tisch ist noch leer.</Text>}
+        {shownTable.map((set, i) => {
           const a = analyzeSet(set);
           const jokerValues = new Map<TileId, number>();
           if (a.valid) a.ordered.forEach((id, k) => jokerValues.set(id, a.values[k]!));
@@ -295,7 +330,13 @@ export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }
               style={[styles.set, a.valid ? styles.setValid : styles.setInvalid, isHover && styles.setHover]}
             >
               <View style={styles.setTiles}>
-                {a.ordered.map((id) => tileView(id, { size: tableTileW, inTable: true, jokerValue: jokerValues.get(id) }))}
+                {a.ordered.map((id) =>
+                  watching ? (
+                    <RommeTile key={id} id={id} size={tableTileW} fresh={!committed.has(id)} jokerValue={jokerValues.get(id)} />
+                  ) : (
+                    tileView(id, { size: tableTileW, inTable: true, jokerValue: jokerValues.get(id) })
+                  ),
+                )}
               </View>
               {!a.valid && <Text style={styles.setError}>noch nicht gültig</Text>}
               {hasSelection && myTurn && (
@@ -420,6 +461,9 @@ export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }
 const styles = StyleSheet.create({
   root: { flex: 1, padding: space.s, gap: space.s, maxWidth: 1100, width: "100%", alignSelf: "center" },
   head: { gap: space.xs },
+  titleRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: space.s },
+  live: { backgroundColor: colors.danger, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  liveText: { color: "#FFFFFF", fontWeight: "900", fontSize: 14, letterSpacing: 1 },
   title: { fontSize: font.title, fontWeight: "800", color: colors.primary, textAlign: "center" },
   waitTitle: { color: colors.textMuted },
   players: { flexDirection: "row", flexWrap: "wrap", gap: space.s, justifyContent: "center", alignItems: "center" },

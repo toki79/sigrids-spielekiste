@@ -7,11 +7,11 @@
  */
 import { generateFamilyCode, normalizeFamilyCode } from "@spielestube/core";
 import type { AnyState } from "../games/registry";
-import { gameFields, newId, type Family, type OnlineBackend, type OnlineGame } from "./types";
+import { gameFields, newId, type Family, type GameDraft, type OnlineBackend, type OnlineGame } from "./types";
 
 interface Db {
   families: Record<string, { code: string; members: Record<string, { name: string; lastSeen: number | null }> }>;
-  games: Record<string, Omit<OnlineGame, "state"> & { stateJson: string }>;
+  games: Record<string, Omit<OnlineGame, "state" | "draft"> & { stateJson: string; draftJson?: string | null }>;
 }
 
 const KEY = "spielestube.lokaler-server.v1";
@@ -57,9 +57,10 @@ function toFamily(code: string, db: Db): Family | null {
 function toGame(id: string, db: Db): OnlineGame | null {
   const g = db.games[id];
   if (!g) return null;
-  const { stateJson, ...rest } = g;
+  const { stateJson, draftJson, ...rest } = g;
   const state = JSON.parse(stateJson) as AnyState;
-  return { ...rest, gameType: state.game ?? "woerterei", id, state };
+  const draft = draftJson ? (JSON.parse(draftJson) as GameDraft) : null;
+  return { ...rest, gameType: state.game ?? "woerterei", id, state, draft };
 }
 
 export class LocalBackend implements OnlineBackend {
@@ -148,9 +149,17 @@ export class LocalBackend implements OnlineBackend {
     const db = read();
     const g = db.games[gameId];
     if (!g || g.moveCount !== expectedMoveCount) return "conflict" as const;
-    db.games[gameId] = { ...g, ...gameFields(next), updatedAt: Date.now(), stateJson: JSON.stringify(next) };
+    db.games[gameId] = { ...g, ...gameFields(next), updatedAt: Date.now(), stateJson: JSON.stringify(next), draftJson: null };
     write(db);
     return "ok" as const;
+  }
+
+  async updateDraft(_code: string, gameId: string, draft: GameDraft | null) {
+    const db = read();
+    const g = db.games[gameId];
+    if (!g) return;
+    g.draftJson = draft ? JSON.stringify(draft) : null;
+    write(db);
   }
 
   async deleteGame(_code: string, gameId: string) {

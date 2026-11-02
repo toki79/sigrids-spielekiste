@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from "react-native";
 import type { WoerterState } from "@spielestube/woerterei";
 import type { RommeState } from "@spielestube/zahlenromme";
@@ -109,6 +109,34 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
     for (const g of GAME_LIST) out[g.type] = g.stats(familyGames.filter((x) => x.state.game === g.type).map((x) => x.state));
     return out;
   }, [familyGames]);
+
+  // Eigene Rommé-Versuche gedrosselt übertragen (höchstens etwa alle 0,7 Sekunden)
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftPending = useRef<{ table: number[][] | null; moveCount: number } | null>(null);
+  const draftLastSent = useRef(0);
+  const sendDraft = useCallback(
+    (table: number[][] | null, moveCount: number) => {
+      if (!membership || !gameId) return;
+      draftPending.current = { table, moveCount };
+      const flush = () => {
+        draftTimer.current = null;
+        const p = draftPending.current;
+        if (!p) return;
+        draftPending.current = null;
+        draftLastSent.current = Date.now();
+        void getBackend()
+          .updateDraft(membership.code, gameId, p.table ? { by: membership.memberId, moveCount: p.moveCount, table: p.table } : null)
+          .catch(() => {});
+      };
+      if (draftTimer.current) return;
+      const wait = Math.max(0, 700 - (Date.now() - draftLastSent.current));
+      draftTimer.current = setTimeout(flush, wait);
+    },
+    [membership?.code, membership?.memberId, gameId],
+  );
+  useEffect(() => () => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+  }, []);
 
   const onlineIds = useMemo(() => new Set((family?.members ?? []).filter((m) => isOnline(m)).map((m) => m.id)), [family]);
 
@@ -234,6 +262,12 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
     content = (
       <RommeScreen
         state={game.state as RommeState}
+        liveDraft={
+          game.draft && game.draft.by === game.turnId && game.draft.moveCount === game.moveCount && game.draft.by !== membership.memberId
+            ? game.draft.table
+            : null
+        }
+        onDraftChange={(table) => sendDraft(table, game.moveCount)}
         viewerId={membership.memberId}
         onlineIds={onlineIds}
         busy={busy}

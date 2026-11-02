@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { formatFamilyCode } from "@spielestube/core";
 import { gameOf } from "../../games/registry";
 import { BigButton } from "../../components/BigButton";
+import { GameIcon } from "../../components/GameIcon";
 import { inviteLink } from "../../online/invite";
 import type { Membership } from "../../online/session";
 import { isOnline, lastSeenText, type Family, type OnlineGame } from "../../online/types";
@@ -52,9 +53,12 @@ export function OnlineHomeScreen({ membership, family, games, connectionProblem,
         style={({ pressed }) => [styles.game, kind === "mine" && styles.gameMine, pressed && styles.pressed]}
         testID={`partie-${kind}`}
       >
-        <Text style={styles.gameTitle}>
-          {gameOf(g.state).icon} {gameOf(g.state).title} mit {opponents(g, me)}
-        </Text>
+        <View style={styles.gameHead}>
+          <GameIcon type={g.state.game} size={44} />
+          <Text style={[styles.gameTitle, { flex: 1 }]}>
+            {gameOf(g.state).title} mit {opponents(g, me)}
+          </Text>
+        </View>
         <Text style={[styles.gameState, kind === "mine" && styles.gameStateMine]}>
           {kind === "done"
             ? `Beendet – ${winner?.name} hat gewonnen`
@@ -164,6 +168,7 @@ const styles = StyleSheet.create({
   game: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 2, borderRadius: radius, padding: space.l, gap: 4 },
   gameMine: { borderColor: colors.primary, borderWidth: 3, backgroundColor: "#E8F0FB" },
   pressed: { opacity: 0.8 },
+  gameHead: { flexDirection: "row", alignItems: "center", gap: space.m },
   gameTitle: { fontSize: font.large, fontWeight: "700", color: colors.text },
   gameState: { fontSize: font.body, color: colors.textMuted, fontWeight: "600" },
   gameStateMine: { color: colors.primary, fontWeight: "800" },
