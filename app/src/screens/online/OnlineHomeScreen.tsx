@@ -9,7 +9,7 @@ interface Props {
   membership: Membership;
   family: Family | null;
   games: OnlineGame[] | null;
-  connectionProblem: boolean;
+  connectionProblem: string | false;
   onOpenGame: (id: string) => void;
   onNewGame: () => void;
   onBack: () => void;
@@ -61,7 +61,7 @@ export function OnlineHomeScreen({ membership, family, games, connectionProblem,
 
       {connectionProblem && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>Keine Verbindung. Bitte prüfe die Internetverbindung – es geht automatisch weiter.</Text>
+          <Text style={styles.errorText}>{connectionProblem}</Text>
         </View>
       )}
 

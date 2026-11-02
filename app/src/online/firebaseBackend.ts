@@ -109,7 +109,7 @@ export class FirebaseBackend implements OnlineBackend {
       const ref = doc(this.db, "families", code);
       const created = await runTransaction(this.db, async (tx) => {
         const snap = await tx.get(ref);
-        if (snap.exists()) return false;
+        if (snap.exists()) return false; // Code schon vergeben → neuer Versuch
         tx.set(ref, {
           code,
           createdAt: Date.now(),
@@ -117,10 +117,6 @@ export class FirebaseBackend implements OnlineBackend {
           members: { [memberId]: { name: founderName.trim(), lastSeen: Date.now() } },
         });
         return true;
-      }).catch((e: unknown) => {
-        // Ein vergebener Code eines anderen Haushalts ist für uns nicht lesbar → neuer Versuch
-        if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "permission-denied") return false;
-        throw e;
       });
       if (created) return { code, memberId };
     }

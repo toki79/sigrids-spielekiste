@@ -5,6 +5,7 @@ import { BigButton } from "../../components/BigButton";
 import { Dialog } from "../../components/Dialog";
 import { getGame } from "../../game";
 import { getBackend } from "../../online/backend";
+import { describeError } from "../../online/errors";
 import { saveMembership, type Membership } from "../../online/session";
 import { isOnline, type Family, type OnlineGame } from "../../online/types";
 import { colors, font, space } from "../../theme";
@@ -27,7 +28,7 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
   const [view, setView] = useState<View_>({ kind: "home" });
   const [family, setFamily] = useState<Family | null>(null);
   const [games, setGames] = useState<OnlineGame[] | null>(null);
-  const [problem, setProblem] = useState(false);
+  const [problem, setProblem] = useState<string | false>(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
         );
       } catch (e) {
         console.warn(e);
-        if (!cancelled) setProblem(true);
+        if (!cancelled) setProblem(describeError(e));
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -69,7 +70,7 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
   // „Gerade da“: jede Minute melden, solange die App im Vordergrund ist
   useEffect(() => {
     if (!membership || !ready) return;
-    const touch = () => void getBackend().touchPresence(membership.code, membership.memberId).catch(() => setProblem(true));
+    const touch = () => void getBackend().touchPresence(membership.code, membership.memberId).catch((e) => setProblem(describeError(e)));
     touch();
     const timer = setInterval(() => {
       if (AppState.currentState === "active") touch();
@@ -116,7 +117,7 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
       setView({ kind: "game", id });
     } catch (e) {
       console.warn(e);
-      setNotice("Die Partie konnte nicht gestartet werden. Bitte prüfe die Internetverbindung.");
+      setNotice(`Die Partie konnte nicht gestartet werden.\n\n${describeError(e)}`);
     } finally {
       setBusy(false);
     }
@@ -130,7 +131,7 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
       if (res === "conflict") setNotice("Die Partie hat sich inzwischen verändert. Bitte schau noch einmal aufs Brett und lege dann erneut.");
     } catch (e) {
       console.warn(e);
-      setNotice("Dein Zug konnte nicht gespeichert werden. Bitte prüfe die Internetverbindung und versuche es noch einmal.");
+      setNotice(`Dein Zug konnte nicht gespeichert werden.\n\n${describeError(e)}`);
     } finally {
       setBusy(false);
     }

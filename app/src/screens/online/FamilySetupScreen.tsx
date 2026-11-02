@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput
 import { formatFamilyCode, isPlausibleFamilyCode, normalizeFamilyCode } from "@spielestube/core";
 import { BigButton } from "../../components/BigButton";
 import { getBackend } from "../../online/backend";
+import { describeError } from "../../online/errors";
 import type { Membership } from "../../online/session";
 import type { Family } from "../../online/types";
 import { colors, font, radius, space, touchMin } from "../../theme";
@@ -13,8 +14,6 @@ interface Props {
 }
 
 type Step = "start" | "code" | "wer" | "neu" | "gruenden" | "fertig";
-
-const OFFLINE = "Das hat leider nicht geklappt. Bitte prüfe die Internetverbindung und versuche es noch einmal.";
 
 /** Einmalige Einrichtung: Familiencode eingeben (oder Familie gründen) und sagen, wer man ist. */
 export function FamilySetupScreen({ onDone, onBack }: Props) {
@@ -33,7 +32,7 @@ export function FamilySetupScreen({ onDone, onBack }: Props) {
       await task();
     } catch (e) {
       console.warn(e);
-      setError(OFFLINE);
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
