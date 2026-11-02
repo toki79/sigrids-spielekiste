@@ -42,6 +42,22 @@ export class CompactDictionary implements Dictionary {
     return new CompactDictionary([...words].map((w) => w.toUpperCase()));
   }
 
+  /**
+   * Aus vorbereiteten Blöcken (Wortlänge → sortierte, aneinandergehängte Wörter),
+   * wie sie `scripts/build-dictionary-module.mjs` erzeugt. Lädt ohne Umsortieren – schnell auf dem Gerät.
+   */
+  static fromBlocks(blocks: Readonly<Record<string, string>>): CompactDictionary {
+    const dict = new CompactDictionary([]);
+    let count = 0;
+    for (const [len, block] of Object.entries(blocks)) {
+      const n = Number(len);
+      dict.byLength.set(n, block);
+      count += block.length / n;
+    }
+    (dict as { size: number }).size = count;
+    return dict;
+  }
+
   has(word: string): boolean {
     const w = word.toUpperCase();
     const len = w.length;

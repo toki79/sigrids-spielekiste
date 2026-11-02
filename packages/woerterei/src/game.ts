@@ -151,7 +151,8 @@ export function applyMove(state: WoerterState, playerId: PlayerId, move: Woerter
   const check = checkMove(state, playerId, move, dictionary);
   if (!check.ok) throw new InvalidMoveError(check.message, check.code);
 
-  const next: WoerterState = structuredClone(state);
+  // JSON-Kopie statt structuredClone: läuft auf allen JavaScript-Engines (auch Hermes auf Android).
+  const next: WoerterState = JSON.parse(JSON.stringify(state));
   const player = next.players[next.turn]!;
   next.moveCount += 1;
 

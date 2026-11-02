@@ -9,6 +9,7 @@ Das vollständige Konzept steht im claude.ai-Projekt „handygame“
 ## Aufbau
 
 ```
+app/           Expo-App (Android, später iOS; im Browser testbar)
 packages/
   core/        Gemeinsame Schnittstelle aller Spiele (GameModule), Zufall
   woerterei/   Wörterei: Brett, Steine, Zugprüfung, Wertung, Spielablauf
@@ -16,23 +17,46 @@ packages/
 scripts/       Werkzeuge, z. B. Aufbereitung der Wortliste
 ```
 
-Später kommen dazu: `app/` (Expo/React Native) und weitere Spiele.
+Später kommen weitere Spiele als eigene Pakete dazu.
 
 ## Stand
 
 - [x] Etappe 1: Spielregeln und Wortliste der Wörterei (getestet)
-- [ ] Etappe 2: Modus „Am selben Gerät“ (erste spielbare App)
+- [x] Etappe 2: Modus „Am selben Gerät“ (erste spielbare App)
 - [ ] Etappe 3: Seniorengerechte Oberfläche, Praxistest
 - [ ] Etappe 4: Online-Modus (Firebase, Push über Expo)
 - [ ] Etappe 5: Verteilung über Google Play (geschlossener Testkanal)
 
 ## Entwickeln
 
+Voraussetzung: Node.js 22 oder neuer.
+
 ```bash
-npm install
+npm install       # erzeugt dabei auch das Wörterbuch-Modul für die App
 npm test          # alle Tests
 npm run typecheck # TypeScript prüfen
 ```
+
+### App ausprobieren
+
+**Auf dem Handy (Expo Go):**
+
+1. App „Expo Go“ aus dem App Store bzw. Play Store installieren.
+2. Am Rechner im Projektordner: `npm run app`
+3. Den angezeigten QR-Code scannen – auf dem iPhone mit der Kamera-App,
+   auf Android in Expo Go. Handy und Rechner müssen im selben WLAN sein.
+
+**Im Browser:** `npm run app:web` und dann http://localhost:8081 öffnen.
+
+### Bedienung (Wörterei, am selben Gerät)
+
+- Namen eintragen (2–4 Spieler), Partie starten
+- Übergabe-Bildschirm: „Ich bin … – Buchstaben zeigen“ (die Bank bleibt bis dahin verdeckt)
+- Buchstaben auf der Bank antippen, dann das Feld antippen; neu gelegte Steine durch Antippen zurücknehmen
+- Vorschau zeigt Wörter und Punkte, Fehler werden verständlich erklärt
+- Joker: Buchstaben im Auswahlfenster wählen
+- Tauschen, Aussetzen, Mischen; „Wort trotzdem gelten lassen“ mit Zustimmung aller
+- Die Partie wird nach jedem Zug gespeichert und kann im Hauptmenü fortgesetzt werden
 
 ## Wörterei – Regeln in Kürze
 

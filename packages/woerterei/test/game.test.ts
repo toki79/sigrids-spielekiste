@@ -211,3 +211,14 @@ describe("Komplette Partie", () => {
     expect(Object.values(LETTER_COUNTS).reduce((a, b) => a + b, 0)).toBe(102);
   }, 120_000);
 });
+
+describe("Wörterbuch-Modul für die App", () => {
+  it("liefert dieselben Ergebnisse wie die Textliste", async () => {
+    const blocks = (await import("../generated/woerter-bloecke.js")).default as Record<string, string>;
+    const fromBlocks = CompactDictionary.fromBlocks(blocks);
+    expect(fromBlocks.size).toBe(dictionary.size);
+    for (const w of ["HAUS", "HÄUSER", "STRASSE", "AB", "ERHOLUNGSURLAUB", "XQZ", "USA"]) {
+      expect(fromBlocks.has(w), w).toBe(dictionary.has(w));
+    }
+  });
+});

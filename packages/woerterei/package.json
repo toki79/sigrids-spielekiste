@@ -8,5 +8,12 @@
   "types": "src/index.ts",
   "dependencies": {
     "@spielestube/core": "0.1.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./woerter-bloecke": {
+      "types": "./generated/woerter-bloecke.d.ts",
+      "default": "./generated/woerter-bloecke.js"
+    }
   }
 }

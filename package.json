@@ -3,13 +3,17 @@
   "private": true,
   "description": "Sigrids Spielestube – seniorengerechte Familienspiele für Android",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "app"
   ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "wortliste": "python3 scripts/build_wordlist.py /usr/share/dict/ngerman packages/woerterei/data/woerter.txt"
+    "wortliste": "python3 scripts/build_wordlist.py /usr/share/dict/ngerman packages/woerterei/data/woerter.txt",
+    "app": "npm run start -w @spielestube/app",
+    "app:web": "npm run web -w @spielestube/app",
+    "postinstall": "node packages/woerterei/scripts/build-dictionary-module.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Sigrids Spielestube",
+    "slug": "sigrids-spielestube",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "de.kiemes.spielestube"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F6F2",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "de.kiemes.spielestube"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "Sigrids Spielestube"
+    }
+  }
+}
