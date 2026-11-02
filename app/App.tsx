@@ -9,12 +9,13 @@ import { GameScreen } from "./src/screens/GameScreen";
 import { HandoverScreen } from "./src/screens/HandoverScreen";
 import { SetupScreen } from "./src/screens/SetupScreen";
 import { StartScreen } from "./src/screens/StartScreen";
+import { VoteScreen } from "./src/screens/VoteScreen";
 import { loadGame, saveGame } from "./src/storage";
 import { loadMembership, type Membership } from "./src/online/session";
 import { OnlineArea } from "./src/screens/online/OnlineArea";
 import { colors, font, space } from "./src/theme";
 
-type Screen = "laden" | "start" | "online" | "spieler" | "uebergabe" | "spiel" | "ende";
+type Screen = "laden" | "start" | "online" | "spieler" | "uebergabe" | "spiel" | "abstimmung" | "ende";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("laden");
@@ -44,9 +45,15 @@ export default function App() {
     setScreen("uebergabe");
   }
 
+  function afterMove(next: WoerterState): Screen {
+    if (next.status === "beendet") return "ende";
+    if (next.wordRequest) return "abstimmung";
+    return "uebergabe";
+  }
+
   function onMove(next: WoerterState) {
     update(next);
-    setScreen(next.status === "beendet" ? "ende" : "uebergabe");
+    setScreen(afterMove(next));
   }
 
   let content;
@@ -66,7 +73,7 @@ export default function App() {
           onlineName={membership?.name ?? null}
           onOnline={() => setScreen("online")}
           savedGame={game}
-          onContinue={() => setScreen(game?.status === "beendet" ? "ende" : "uebergabe")}
+          onContinue={() => game && setScreen(afterMove(game))}
           onNewGame={() => setScreen("spieler")}
         />
       );
@@ -80,6 +87,21 @@ export default function App() {
     case "uebergabe":
       content = game && <HandoverScreen state={game} onReveal={() => setScreen("spiel")} onMenu={() => setScreen("start")} />;
       break;
+    case "abstimmung": {
+      const voterId = game?.wordRequest ? Object.entries(game.wordRequest.votes).find(([, v]) => v === null)?.[0] : undefined;
+      content =
+        game && voterId ? (
+          <VoteScreen
+            key={`${voterId}-${game.moveCount}`}
+            state={game}
+            voterId={voterId}
+            handover
+            onVote={(accept) => onMove(getGame().applyMove(game, voterId, { type: "abstimmen", accept }))}
+            onMenu={() => setScreen("start")}
+          />
+        ) : null;
+      break;
+    }
     case "spiel":
       content = game && <GameScreen state={game} onMove={onMove} onMenu={() => setScreen("start")} />;
       break;

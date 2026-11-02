@@ -48,6 +48,8 @@ export interface OnlineBackend {
   touchPresence(code: string, memberId: string): Promise<void>;
   createGame(code: string, state: WoerterState): Promise<string>;
   watchGames(code: string, memberId: string, onChange: (games: OnlineGame[]) => void): Unsubscribe;
+  /** Alle Partien der Familie (für Statistik und Rangliste). */
+  watchFamilyGames(code: string, onChange: (games: OnlineGame[]) => void): Unsubscribe;
   watchGame(code: string, gameId: string, onChange: (game: OnlineGame | null) => void): Unsubscribe;
   /** Zug speichern – nur wenn die Partie noch beim erwarteten Stand ist. */
   submitMove(code: string, gameId: string, expectedMoveCount: number, next: WoerterState): Promise<SubmitResult>;

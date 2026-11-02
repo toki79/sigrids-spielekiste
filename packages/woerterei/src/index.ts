@@ -3,3 +3,4 @@ export * from "./dictionary";
 export * from "./game";
 export * from "./rules";
 export * from "./tiles";
+export * from "./stats";

@@ -14,6 +14,7 @@ import {
   checkPlay,
   createWoerterei,
   fullBag,
+  playersToAct,
   removeFromRack,
   type Placement,
   type WoerterMove,
@@ -220,5 +221,73 @@ describe("Wörterbuch-Modul für die App", () => {
     for (const w of ["HAUS", "HÄUSER", "STRASSE", "AB", "ERHOLUNGSURLAUB", "XQZ", "USA"]) {
       expect(fromBlocks.has(w), w).toBe(dictionary.has(w));
     }
+  });
+});
+
+describe("Wort-Abstimmung", () => {
+  function prepared(n = 2): WoerterState {
+    const ps = [
+      { id: "sigrid", name: "Sigrid" },
+      { id: "tobi", name: "Tobi" },
+      { id: "oma", name: "Oma" },
+    ].slice(0, n);
+    const s = spiel.createGame(ps, 99);
+    s.turn = 0;
+    s.players[0]!.rack = ["H", "A", "U", "S", "E", "N", "?"];
+    return s;
+  }
+  const hausn: Placement[] = [..."HAUSN"].map((letter, i) => ({ row: CENTER, col: 5 + i, letter }));
+  const haus: Placement[] = [..."HAUS"].map((letter, i) => ({ row: CENTER, col: 5 + i, letter }));
+
+  it("lässt nur unbekannte Wörter zur Abstimmung zu", () => {
+    const s = prepared();
+    expect(spiel.checkMove(s, "sigrid", { type: "wort_anfragen", placements: haus })).toMatchObject({ ok: false, code: "ALLES_BEKANNT" });
+    expect(spiel.checkMove(s, "sigrid", { type: "wort_anfragen", placements: [{ row: 0, col: 0, letter: "A" }] }).ok).toBe(false);
+    expect(spiel.checkMove(s, "sigrid", { type: "wort_anfragen", placements: hausn })).toMatchObject({ ok: true, details: { words: ["HAUSN"] } });
+  });
+
+  it("der Gegenspieler muss zustimmen – dann wird gelegt", () => {
+    let s = spiel.applyMove(prepared(), "sigrid", { type: "wort_anfragen", placements: hausn });
+    expect(s.wordRequest?.words).toEqual(["HAUSN"]);
+    expect(playersToAct(s)).toEqual(["tobi"]);
+    expect(spiel.currentPlayer(s)).toBe("sigrid");
+    // Sigrid kann nicht selbst zustimmen und nichts anderes tun
+    expect(spiel.checkMove(s, "sigrid", { type: "abstimmen", accept: true }).ok).toBe(false);
+    expect(spiel.checkMove(s, "sigrid", { type: "aussetzen" })).toMatchObject({ ok: false, code: "ANFRAGE_OFFEN" });
+    s = spiel.applyMove(s, "tobi", { type: "abstimmen", accept: true });
+    expect(s.wordRequest).toBeNull();
+    expect(s.extraWords).toContain("HAUSN");
+    expect(cellAt(s.board, CENTER, 9)).toBe("N");
+    expect(s.players[0]!.score).toBeGreaterThan(0);
+    expect(spiel.currentPlayer(s)).toBe("tobi");
+    expect(s.history.map((h) => h.type)).toEqual(["anfrage", "abstimmung", "legen"]);
+  });
+
+  it("ein Nein beendet die Anfrage, der Spieler bleibt dran", () => {
+    let s = spiel.applyMove(prepared(), "sigrid", { type: "wort_anfragen", placements: hausn });
+    s = spiel.applyMove(s, "tobi", { type: "abstimmen", accept: false });
+    expect(s.wordRequest).toBeNull();
+    expect(s.board).toBe(prepared().board);
+    expect(spiel.currentPlayer(s)).toBe("sigrid");
+    expect(s.extraWords).toEqual([]);
+    expect(s.scorelessTurns).toBe(0);
+  });
+
+  it("bei drei Spielern müssen beide anderen zustimmen", () => {
+    let s = spiel.applyMove(prepared(3), "sigrid", { type: "wort_anfragen", placements: hausn });
+    s = spiel.applyMove(s, "tobi", { type: "abstimmen", accept: true });
+    expect(s.wordRequest).not.toBeNull();
+    expect(playersToAct(s)).toEqual(["oma"]);
+    expect(spiel.checkMove(s, "tobi", { type: "abstimmen", accept: true })).toMatchObject({ ok: false, code: "SCHON_ABGESTIMMT" });
+    s = spiel.applyMove(s, "oma", { type: "abstimmen", accept: true });
+    expect(s.wordRequest).toBeNull();
+    expect(cellAt(s.board, CENTER, 9)).toBe("N");
+  });
+
+  it("die Anfrage kann zurückgezogen werden", () => {
+    let s = spiel.applyMove(prepared(), "sigrid", { type: "wort_anfragen", placements: hausn });
+    s = spiel.applyMove(s, "sigrid", { type: "anfrage_zurueckziehen" });
+    expect(s.wordRequest).toBeNull();
+    expect(spiel.checkMove(s, "sigrid", { type: "legen", placements: haus }).ok).toBe(true);
   });
 });

@@ -186,6 +186,15 @@ export class FirebaseBackend implements OnlineBackend {
     );
   }
 
+  watchFamilyGames(code: string, onChange: (games: OnlineGame[]) => void) {
+    const c = normalizeFamilyCode(code);
+    return onSnapshot(
+      collection(this.db, "families", c, "games"),
+      (snap) => onChange(snap.docs.map((d) => toGame(c, d.id, d.data())).filter((g): g is OnlineGame => g !== null)),
+      (e) => console.warn("Statistik konnte nicht geladen werden", e),
+    );
+  }
+
   watchGame(code: string, gameId: string, onChange: (game: OnlineGame | null) => void) {
     const c = normalizeFamilyCode(code);
     return onSnapshot(

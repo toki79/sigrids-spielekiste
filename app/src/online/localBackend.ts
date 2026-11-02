@@ -131,6 +131,14 @@ export class LocalBackend implements OnlineBackend {
     });
   }
 
+  watchFamilyGames(code: string, onChange: (games: OnlineGame[]) => void) {
+    const c = normalizeFamilyCode(code);
+    return subscribe(() => {
+      const db = read();
+      onChange(Object.keys(db.games).map((id) => toGame(id, db)).filter((g): g is OnlineGame => !!g && g.familyCode === c));
+    });
+  }
+
   watchGame(_code: string, gameId: string, onChange: (game: OnlineGame | null) => void) {
     return subscribe(() => onChange(toGame(gameId, read())));
   }

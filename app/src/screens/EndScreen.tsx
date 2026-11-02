@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { result, type WoerterState } from "@spielestube/woerterei";
 import { BigButton } from "../components/BigButton";
+import { Confetti } from "../components/Confetti";
 import { playerName, points } from "../texts";
 import { colors, font, radius, space } from "../theme";
 
@@ -17,7 +18,9 @@ export function EndScreen({ state, onNewGame, onMenu, newGameLabel = "Neue Parti
   const end = state.history.at(-1);
   const winners = res.winners.map((id) => playerName(state, id));
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView contentContainerStyle={styles.wrap}>
+      <Text style={styles.trophy}>🏆</Text>
       <Text style={styles.title} accessibilityRole="header">
         {winners.length === 1 ? `${winners[0]} hat gewonnen!` : `Unentschieden: ${winners.join(" und ")}!`}
       </Text>
@@ -47,11 +50,14 @@ export function EndScreen({ state, onNewGame, onMenu, newGameLabel = "Neue Parti
       <BigButton label={newGameLabel} onPress={onNewGame} />
       <BigButton label={menuLabel} variant="secondary" onPress={onMenu} />
     </ScrollView>
+    <Confetti />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { padding: space.xl, gap: space.l, maxWidth: 640, width: "100%", alignSelf: "center" },
+  trophy: { fontSize: 72, textAlign: "center", marginTop: space.l },
   title: { fontSize: font.huge, fontWeight: "800", color: colors.primary, textAlign: "center", marginTop: space.l },
   text: { fontSize: font.body, color: colors.text, textAlign: "center", lineHeight: font.body * 1.4 },
   table: { gap: space.s },

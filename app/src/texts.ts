@@ -17,9 +17,20 @@ export function describeEntry(state: WoerterState, entry: HistoryEntry | undefin
       return `${playerName(state, entry.playerId)} hat ${entry.count === 1 ? "einen Buchstaben" : `${entry.count} Buchstaben`} getauscht.`;
     case "aussetzen":
       return `${playerName(state, entry.playerId)} hat ausgesetzt.`;
+    case "anfrage":
+      return `${playerName(state, entry.playerId)} möchte ${quoteWords(entry.words)} legen und fragt, ob ${entry.words.length === 1 ? "es gilt" : "sie gelten"}.`;
+    case "abstimmung":
+      return entry.accept
+        ? `${playerName(state, entry.playerId)} ist mit ${quoteWords(entry.words)} einverstanden.`
+        : `${playerName(state, entry.playerId)} hat ${quoteWords(entry.words)} abgelehnt.`;
     case "ende":
       return entry.reason === "ausgespielt" ? "Die Buchstaben sind aufgebraucht – die Partie ist zu Ende." : "Keiner konnte mehr legen – die Partie ist zu Ende.";
   }
+}
+
+export function quoteWords(words: readonly string[]): string {
+  const q = words.map((w) => `„${w}“`);
+  return q.length <= 1 ? (q[0] ?? "") : `${q.slice(0, -1).join(", ")} und ${q.at(-1)}`;
 }
 
 export function lastMoveEntry(state: WoerterState): HistoryEntry | undefined {

@@ -74,7 +74,7 @@ wie eine App ablegen).
 - Neu gelegte Steine lassen sich verschieben, zurück auf die Bank ziehen oder durch Antippen zurücknehmen
 - Vorschau zeigt Wörter und Punkte, Fehler werden verständlich erklärt
 - Joker: Buchstaben im Auswahlfenster wählen
-- Tauschen, Aussetzen, Mischen; „Wort trotzdem gelten lassen“ mit Zustimmung aller
+- Tauschen, Aussetzen, Mischen; unbekannte Wörter den Mitspielern zur Abstimmung vorlegen
 - Die Partie wird nach jedem Zug gespeichert und kann im Hauptmenü fortgesetzt werden
 
 ## Wörterei – Regeln in Kürze
@@ -89,7 +89,9 @@ wie eine App ablegen).
 - Ende, wenn ein Spieler ausgespielt hat und der Beutel leer ist, oder wenn
   alle Spieler zweimal hintereinander keine Punkte gemacht haben
 - Reststeine werden abgezogen; wer ausspielt, bekommt die Reststeine der anderen
-- Fehlt ein Wort im Wörterbuch, kann es mit Zustimmung aller für die Partie erlaubt werden
+- Fehlt ein Wort im Wörterbuch, kann der Spieler die anderen fragen: Stimmen alle zu, wird
+  der Zug gelegt; sagt jemand Nein, ist der Spieler noch einmal dran
+- Rangliste der Familie (Siege, Ø Punkte, Rekorde) – die Nummer 1 wird mit Krone und Konfetti gefeiert
 
 ## Lizenzen
 

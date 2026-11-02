@@ -6,7 +6,6 @@ import {
   JOKER,
   LETTERS,
   RACK_SIZE,
-  allowWord,
   cellAt,
   checkPlay,
   type Placement,
@@ -21,7 +20,7 @@ import { Scoreboard } from "../components/Scoreboard";
 import { Tile } from "../components/Tile";
 import { loadDictionary } from "../dictionary";
 import { getGame } from "../game";
-import { describeEntry, lastMoveEntry, points } from "../texts";
+import { describeEntry, lastMoveEntry, points, quoteWords } from "../texts";
 import { colors, font, radius, space } from "../theme";
 
 interface Props {
@@ -48,7 +47,14 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
   const current = state.players[state.turn]!;
   // Am selben Gerät spielt immer, wer dran ist. Online sieht jeder nur seine eigene Bank.
   const player = (viewerId && state.players.find((p) => p.id === viewerId)) || current;
-  const myTurn = state.status === "laeuft" && current.id === player.id;
+  // Offene Wort-Anfrage: Brett zeigt die vorgeschlagenen Steine, niemand legt, bis entschieden ist.
+  const request = state.wordRequest ?? null;
+  const myTurn = state.status === "laeuft" && current.id === player.id && !request;
+  const waitingVoters = request
+    ? Object.entries(request.votes)
+        .filter(([, v]) => v === null)
+        .map(([id]) => state.players.find((p) => p.id === id)?.name ?? "")
+    : [];
   const online = !!viewerId;
 
   const [rack, setRack] = useState<string[]>(player.rack);
@@ -82,6 +88,14 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
 
   const placements = pending.map((p) => p.placement);
   const usedIdx = new Set(pending.map((p) => p.rackIndex));
+  // Während der eigenen Wort-Anfrage liegen die vorgeschlagenen Steine auf dem Brett – auf der Bank ausblenden
+  if (state.wordRequest && state.wordRequest.playerId === player.id) {
+    for (const p of state.wordRequest.placements) {
+      const tile = p.joker ? JOKER : p.letter;
+      const i = rack.findIndex((t, k) => t === tile && !usedIdx.has(k));
+      if (i >= 0) usedIdx.add(i);
+    }
+  }
 
   // Live-Prüfung des geplanten Zuges (für Punktevorschau und verständliche Hinweise)
   const check = useMemo(
@@ -299,11 +313,9 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
     }
   }
 
-  function playAnyway() {
-    let s = state;
-    for (const w of unknownWords) s = allowWord(s, w);
+  function askForApproval() {
     setConfirm(null);
-    commit({ type: "legen", placements }, s);
+    commit({ type: "wort_anfragen", placements });
   }
 
   // ---------- Darstellung ----------
@@ -326,7 +338,15 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
       kind: "ok",
     };
   } else if (check && !check.ok) status = { text: check.message, kind: "error" };
-  else if (!myTurn) {
+  else if (request) {
+    status = {
+      text:
+        request.playerId === player.id
+          ? `Du hast gefragt, ob ${quoteWords(request.words)} gelten darf. Jetzt ${waitingVoters.length === 1 ? "entscheidet" : "entscheiden"} ${waitingVoters.join(" und ")}.`
+          : `${current.name} möchte ${quoteWords(request.words)} legen. Warte auf die Entscheidung von ${waitingVoters.join(" und ")}.`,
+      kind: "info",
+    };
+  } else if (!myTurn) {
     const last = describeEntry(state, lastMoveEntry(state));
     status = {
       text: `${last ? `${last}\n` : ""}Jetzt ist ${current.name} dran. Sobald ${current.name} gelegt hat, siehst du es hier.`,
@@ -337,7 +357,13 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
     status = { text: last ?? "Lege das erste Wort über den Stern in der Mitte.", kind: "info" };
   }
 
-  const title = online ? (myTurn ? "Du bist dran" : `${current.name} ist dran`) : `${current.name} ist dran`;
+  const title = request
+    ? "Abstimmung über ein Wort"
+    : online
+      ? myTurn
+        ? "Du bist dran"
+        : `${current.name} ist dran`
+      : `${current.name} ist dran`;
 
   const panel = (
     <View style={[styles.panel, { width: panelWidth }]}>
@@ -379,7 +405,19 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
         )}
       </View>
 
-      {!myTurn ? (
+      {request && request.playerId === player.id ? (
+        <View style={styles.buttons}>
+          <BigButton
+            label="Frage zurückziehen"
+            variant="secondary"
+            compact
+            onPress={() => commit({ type: "anfrage_zurueckziehen" })}
+            style={styles.half}
+            testID="zurueckziehen"
+          />
+          <BigButton label={online ? "Zu meinen Partien" : "Menü"} variant="secondary" compact onPress={online ? onMenu : () => setConfirm("menu")} style={styles.half} />
+        </View>
+      ) : !myTurn ? (
         <View style={styles.buttons}>
           <BigButton label="Mischen" variant="secondary" compact onPress={shuffleRack} style={styles.half} />
           <BigButton label={online ? "Zu meinen Partien" : "Menü"} variant="secondary" compact onPress={online ? onMenu : () => setConfirm("menu")} style={styles.half} />
@@ -394,7 +432,14 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
             style={styles.full}
           />
           {unknownWords.length > 0 && (
-            <BigButton label="Wort trotzdem gelten lassen …" variant="secondary" compact onPress={() => setConfirm("erlauben")} style={styles.full} />
+            <BigButton
+              label={`Fragen, ob ${unknownWords.length === 1 ? "das Wort" : "die Wörter"} gelten darf …`}
+              variant="secondary"
+              compact
+              onPress={() => setConfirm("erlauben")}
+              style={styles.full}
+              testID="fragen"
+            />
           )}
           {pending.length > 0 ? (
             <BigButton label="Steine zurücknehmen" variant="secondary" compact onPress={takeBack} style={styles.half} />
@@ -452,12 +497,12 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
           <Board
             ref={boardRef}
             board={state.board}
-            pending={placements}
+            pending={request ? request.placements : placements}
             lastMove={lastMoveCells}
             size={boardSize}
             onCellPress={onCellPress}
             hover={hover}
-            wrapPending={wrapPending}
+            wrapPending={request ? undefined : wrapPending}
           />
           <BoardLegend />
         </View>
@@ -511,10 +556,10 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
 
       <Dialog
         visible={confirm === "erlauben"}
-        title="Wort gelten lassen?"
-        message={`${unknownWords.map((w) => `„${w}“`).join(", ")} steht nicht in unserem Wörterbuch. Sind alle Mitspieler einverstanden, dass es in dieser Partie gilt?`}
-        confirmLabel="Ja, alle sind einverstanden"
-        onConfirm={playAnyway}
+        title="Die anderen fragen?"
+        message={`${quoteWords(unknownWords)} steht nicht in unserem Wörterbuch. ${state.players.filter((p) => p.id !== player.id).map((p) => p.name).join(" und ")} entscheiden, ob es in dieser Partie gilt. Sagen alle Ja, wird dein Zug gelegt – sagt jemand Nein, bist du noch einmal dran.`}
+        confirmLabel="Ja, fragen"
+        onConfirm={askForApproval}
         onCancel={() => setConfirm(null)}
       />
     </>

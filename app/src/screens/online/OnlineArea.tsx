@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from "react-native";
-import type { WoerterState } from "@spielestube/woerterei";
+import { computeStats, type WoerterState } from "@spielestube/woerterei";
 import { BigButton } from "../../components/BigButton";
 import { Dialog } from "../../components/Dialog";
 import { getGame } from "../../game";
@@ -10,6 +10,8 @@ import { saveMembership, type Membership } from "../../online/session";
 import { isOnline, type Family, type OnlineGame } from "../../online/types";
 import { colors, font, space } from "../../theme";
 import { EndScreen } from "../EndScreen";
+import { VoteScreen } from "../VoteScreen";
+import { StatsScreen } from "./StatsScreen";
 import { GameScreen } from "../GameScreen";
 import { FamilySetupScreen } from "./FamilySetupScreen";
 import { NewOnlineGameScreen } from "./NewOnlineGameScreen";
@@ -21,13 +23,14 @@ interface Props {
   onExit: () => void;
 }
 
-type View_ = { kind: "home" } | { kind: "new" } | { kind: "game"; id: string };
+type View_ = { kind: "home" } | { kind: "new" } | { kind: "stats" } | { kind: "game"; id: string };
 
 /** Online-Modus: Einrichtung, „Meine Partien“, neue Partie, laufende Partie. */
 export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
   const [view, setView] = useState<View_>({ kind: "home" });
   const [family, setFamily] = useState<Family | null>(null);
   const [games, setGames] = useState<OnlineGame[] | null>(null);
+  const [familyGames, setFamilyGames] = useState<OnlineGame[] | null>(null);
   const [problem, setProblem] = useState<string | false>(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,6 +51,7 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
         if (cancelled) return;
         setProblem(false);
         unsubs.push(backend.watchFamily(membership.code, setFamily));
+        unsubs.push(backend.watchFamilyGames(membership.code, setFamilyGames));
         unsubs.push(
           backend.watchGames(membership.code, membership.memberId, (g) => {
             setGames(g);
@@ -90,6 +94,8 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
     setGame(undefined);
     return getBackend().watchGame(membership.code, gameId, setGame);
   }, [membership?.code, gameId]);
+
+  const stats = useMemo(() => (familyGames ? computeStats(familyGames.map((g) => g.state)) : null), [familyGames]);
 
   const onlineIds = useMemo(() => new Set((family?.members ?? []).filter((m) => isOnline(m)).map((m) => m.id)), [family]);
 
@@ -147,8 +153,19 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
         connectionProblem={problem}
         onOpenGame={(id) => setView({ kind: "game", id })}
         onNewGame={() => setView({ kind: "new" })}
+        onStats={() => setView({ kind: "stats" })}
+        champions={stats ? stats.ranking.filter((r) => r.rank === 1).map((r) => r.name) : []}
         onBack={onExit}
         onLeave={() => setConfirmLeave(true)}
+      />
+    );
+  } else if (view.kind === "stats") {
+    content = (
+      <StatsScreen
+        ranking={stats?.ranking ?? null}
+        records={stats?.records ?? null}
+        meId={membership.memberId}
+        onBack={() => setView({ kind: "home" })}
       />
     );
   } else if (view.kind === "new") {
@@ -182,6 +199,20 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
         newGameLabel="Neue Partie starten"
         menuLabel="Zu meinen Partien"
         onNewGame={() => setView({ kind: "new" })}
+        onMenu={() => setView({ kind: "home" })}
+      />
+    );
+  } else if (game.state.wordRequest && game.state.wordRequest.votes[membership.memberId] === null) {
+    // Ich soll über ein Wort entscheiden
+    content = (
+      <VoteScreen
+        state={game.state}
+        voterId={membership.memberId}
+        busy={busy}
+        menuLabel="Zu meinen Partien"
+        onVote={(accept) =>
+          void submit(game, getGame().applyMove(game.state, membership.memberId, { type: "abstimmen", accept }))
+        }
         onMenu={() => setView({ kind: "home" })}
       />
     );
