@@ -1,0 +1,9 @@
+{
+  "name": "@spielestube/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gemeinsame Bausteine aller Spiele der Spielestube",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

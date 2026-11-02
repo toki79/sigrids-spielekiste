@@ -1,0 +1,12 @@
+{
+  "name": "@spielestube/woerterei",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Wörterei – Wortlegespiel für Sigrids Spielestube (Spielregeln, Wertung, Wörterbuch)",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@spielestube/core": "0.1.0"
+  }
+}

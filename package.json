@@ -1,0 +1,19 @@
+{
+  "name": "sigrids-spielekiste",
+  "private": true,
+  "description": "Sigrids Spielestube – seniorengerechte Familienspiele für Android",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "wortliste": "python3 scripts/build_wordlist.py /usr/share/dict/ngerman packages/woerterei/data/woerter.txt"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
