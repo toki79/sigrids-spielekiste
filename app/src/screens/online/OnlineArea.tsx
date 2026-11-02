@@ -6,6 +6,8 @@ import { Dialog } from "../../components/Dialog";
 import { getGame } from "../../game";
 import { getBackend } from "../../online/backend";
 import { describeError } from "../../online/errors";
+import { shareInvite } from "../../online/invite";
+import { formatFamilyCode } from "@spielestube/core";
 import { saveMembership, type Membership } from "../../online/session";
 import { isOnline, type Family, type OnlineGame } from "../../online/types";
 import { colors, font, space } from "../../theme";
@@ -19,6 +21,9 @@ import { OnlineHomeScreen } from "./OnlineHomeScreen";
 
 interface Props {
   membership: Membership | null;
+  /** Familiencode aus einem Einladungslink (wird nach Verwendung verworfen). */
+  invitedCode?: string | null;
+  onInviteHandled?: () => void;
   onMembershipChange: (m: Membership | null) => void;
   onExit: () => void;
 }
@@ -26,7 +31,7 @@ interface Props {
 type View_ = { kind: "home" } | { kind: "new" } | { kind: "stats" } | { kind: "game"; id: string };
 
 /** Online-Modus: Einrichtung, „Meine Partien“, neue Partie, laufende Partie. */
-export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
+export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembershipChange, onExit }: Props) {
   const [view, setView] = useState<View_>({ kind: "home" });
   const [family, setFamily] = useState<Family | null>(null);
   const [games, setGames] = useState<OnlineGame[] | null>(null);
@@ -102,7 +107,9 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
   if (!membership) {
     return (
       <FamilySetupScreen
+        invitedCode={invitedCode}
         onDone={(m) => {
+          onInviteHandled?.();
           void saveMembership(m);
           onMembershipChange(m);
           setView({ kind: "home" });
@@ -154,6 +161,12 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
         onOpenGame={(id) => setView({ kind: "game", id })}
         onNewGame={() => setView({ kind: "new" })}
         onStats={() => setView({ kind: "stats" })}
+        onInvite={async () => {
+          const res = await shareInvite(membership.code, membership.name);
+          if (res === "kopiert") setNotice("Die Einladung ist kopiert. Füge sie z. B. in WhatsApp oder eine E-Mail ein.");
+          else if (res === "nichts" && typeof navigator !== "undefined" && !navigator.share)
+            setNotice("Bitte kopiere den Link unter dem Familiencode und schicke ihn weiter.");
+        }}
         champions={stats ? stats.ranking.filter((r) => r.rank === 1).map((r) => r.name) : []}
         onBack={onExit}
         onLeave={() => setConfirmLeave(true)}
@@ -232,6 +245,21 @@ export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
   return (
     <>
       {content}
+      <Dialog
+        visible={!!invitedCode && invitedCode !== membership.code}
+        title="Einladung in eine andere Familie"
+        message={`Du wurdest in die Familie ${formatFamilyCode(invitedCode ?? "")} eingeladen. Auf diesem Gerät spielst du bisher in der Familie ${formatFamilyCode(membership.code)}. Möchtest du wechseln? Deine bisherigen Partien bleiben dort erhalten.`}
+        confirmLabel="Ja, wechseln"
+        onConfirm={() => {
+          void saveMembership(null);
+          setFamily(null);
+          setGames(null);
+          setFamilyGames(null);
+          setView({ kind: "home" });
+          onMembershipChange(null);
+        }}
+        onCancel={() => onInviteHandled?.()}
+      />
       <Dialog visible={!!notice} title="Hinweis" message={notice ?? ""} cancelLabel="OK" onCancel={() => setNotice(null)} />
       <Dialog
         visible={confirmLeave}

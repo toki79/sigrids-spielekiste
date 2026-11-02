@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { formatFamilyCode, isPlausibleFamilyCode, normalizeFamilyCode } from "@spielestube/core";
 import { BigButton } from "../../components/BigButton";
@@ -9,6 +9,8 @@ import type { Family } from "../../online/types";
 import { colors, font, radius, space, touchMin } from "../../theme";
 
 interface Props {
+  /** Über einen Einladungslink geöffnet: Code ist schon bekannt. */
+  invitedCode?: string | null;
   onDone: (m: Membership) => void;
   onBack: () => void;
 }
@@ -16,8 +18,8 @@ interface Props {
 type Step = "start" | "code" | "wer" | "neu" | "gruenden" | "fertig";
 
 /** Einmalige Einrichtung: Familiencode eingeben (oder Familie gründen) und sagen, wer man ist. */
-export function FamilySetupScreen({ onDone, onBack }: Props) {
-  const [step, setStep] = useState<Step>("start");
+export function FamilySetupScreen({ invitedCode, onDone, onBack }: Props) {
+  const [step, setStep] = useState<Step>(invitedCode ? "code" : "start");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [family, setFamily] = useState<Family | null>(null);
@@ -38,15 +40,16 @@ export function FamilySetupScreen({ onDone, onBack }: Props) {
     }
   }
 
-  const checkCode = () =>
+  const checkCode = (c: string = code) =>
     run(async () => {
-      if (!isPlausibleFamilyCode(code)) {
+      if (!isPlausibleFamilyCode(c)) {
         setError("Ein Familiencode sieht so aus: BLUME-27 (ein Wort und eine Zahl).");
         return;
       }
-      const f = await getBackend().getFamily(code);
+      const f = await getBackend().getFamily(c);
       if (!f) {
-        setError(`Den Familiencode „${formatFamilyCode(code)}“ gibt es nicht. Bitte prüfe die Schreibweise.`);
+        setError(`Den Familiencode „${formatFamilyCode(c)}“ gibt es nicht. Bitte prüfe die Schreibweise.`);
+        setStep("code");
         return;
       }
       setFamily(f);
@@ -59,6 +62,15 @@ export function FamilySetupScreen({ onDone, onBack }: Props) {
       await getBackend().joinFamily(c, { memberId });
       onDone({ code: c, memberId, name: memberName });
     });
+
+  // Einladungslink: Code übernehmen und gleich nachschlagen
+  useEffect(() => {
+    if (invitedCode) {
+      setCode(formatFamilyCode(invitedCode));
+      void checkCode(invitedCode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invitedCode]);
 
   const trimmed = name.trim();
   const nameTaken = !!family?.members.some((m) => m.name.toLowerCase() === trimmed.toLowerCase());
@@ -126,9 +138,9 @@ export function FamilySetupScreen({ onDone, onBack }: Props) {
             autoCorrect={false}
             maxLength={20}
             accessibilityLabel="Familiencode"
-            onSubmitEditing={checkCode}
+            onSubmitEditing={() => checkCode()}
           />
-          <BigButton label={busy ? "Einen Moment …" : "Weiter"} disabled={busy || !code.trim()} onPress={checkCode} testID="code-weiter" />
+          <BigButton label={busy ? "Einen Moment …" : "Weiter"} disabled={busy || !code.trim()} onPress={() => checkCode()} testID="code-weiter" />
           <BigButton label="Zurück" variant="secondary" onPress={() => setStep("start")} />
         </>
       );
@@ -136,10 +148,15 @@ export function FamilySetupScreen({ onDone, onBack }: Props) {
     case "wer":
       body = (
         <>
+          {invitedCode && (
+            <Text style={styles.invited}>Du wurdest in die Familie {formatFamilyCode(invitedCode)} eingeladen. Schön, dass du dabei bist!</Text>
+          )}
           <Text style={styles.title}>Wer bist du?</Text>
           {family && family.members.length > 0 && (
             <>
-              <Text style={styles.text}>Warst du schon einmal dabei? Dann tippe auf deinen Namen.</Text>
+              <Text style={styles.text}>
+                Spielst du schon auf einem anderen Handy oder Tablet mit? Dann tippe auf deinen Namen – du siehst hier dieselben Partien.
+              </Text>
               {family.members.map((m) => (
                 <BigButton key={m.id} label={`Ich bin ${m.name}`} variant="secondary" disabled={busy} onPress={() => joinAs(m.id, m.name)} />
               ))}
@@ -223,6 +240,7 @@ const styles = StyleSheet.create({
   codeInput: { fontSize: font.title, letterSpacing: 2, textAlign: "center" },
   codeBox: { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 3, borderRadius: radius, padding: space.l },
   codeBig: { fontSize: 44, fontWeight: "800", color: colors.primary, textAlign: "center", letterSpacing: 3 },
+  invited: { fontSize: font.large, color: colors.success, fontWeight: "700", lineHeight: font.large * 1.35 },
   warn: { fontSize: font.body, color: colors.danger, fontWeight: "600" },
   errorBox: { backgroundColor: colors.errorBg, borderColor: "#E79A93", borderWidth: 2, borderRadius: radius, padding: space.m },
   errorText: { fontSize: font.body, color: colors.text, fontWeight: "600", lineHeight: font.body * 1.35 },

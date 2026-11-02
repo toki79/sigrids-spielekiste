@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { formatFamilyCode } from "@spielestube/core";
 import { playersToAct } from "@spielestube/woerterei";
 import { BigButton } from "../../components/BigButton";
+import { inviteLink } from "../../online/invite";
 import type { Membership } from "../../online/session";
 import { isOnline, lastSeenText, type Family, type OnlineGame } from "../../online/types";
 import { colors, font, radius, space } from "../../theme";
@@ -14,6 +15,7 @@ interface Props {
   onOpenGame: (id: string) => void;
   onNewGame: () => void;
   onStats: () => void;
+  onInvite: () => void;
   /** Wer führt die Rangliste an? (leer, solange keine Partie beendet ist) */
   champions: string[];
   onBack: () => void;
@@ -30,7 +32,7 @@ function scoreLine(game: OnlineGame): string {
 }
 
 /** „Meine Partien“: wer ist dran, neue Partie, Familiencode. */
-export function OnlineHomeScreen({ membership, family, games, connectionProblem, onOpenGame, onNewGame, onStats, champions, onBack, onLeave }: Props) {
+export function OnlineHomeScreen({ membership, family, games, connectionProblem, onOpenGame, onNewGame, onStats, onInvite, champions, onBack, onLeave }: Props) {
   const me = membership.memberId;
   const needsMe = (g: OnlineGame) => playersToAct(g.state).includes(me);
   const mine = (games ?? []).filter((g) => g.status === "laeuft" && needsMe(g));
@@ -91,9 +93,10 @@ export function OnlineHomeScreen({ membership, family, games, connectionProblem,
 
       <BigButton label="Neue Partie starten" onPress={onNewGame} disabled={others.length === 0} testID="neue-partie" />
       {family && others.length === 0 && (
-        <Text style={styles.hint}>
-          Noch ist niemand außer dir in der Familie. Gib den Familiencode {formatFamilyCode(membership.code)} weiter.
-        </Text>
+        <>
+          <Text style={styles.hint}>Noch ist niemand außer dir in der Familie. Schicke deiner Familie den Einladungslink.</Text>
+          <BigButton label="Familie einladen" onPress={onInvite} testID="einladen-oben" />
+        </>
       )}
 
       {games === null ? (
@@ -130,6 +133,13 @@ export function OnlineHomeScreen({ membership, family, games, connectionProblem,
         <Text style={styles.code} selectable>
           {formatFamilyCode(membership.code)}
         </Text>
+        <Text style={styles.link} selectable>
+          {inviteLink(membership.code)}
+        </Text>
+        <BigButton label="Familie einladen" onPress={onInvite} style={styles.inviteButton} testID="einladen" />
+        <Text style={styles.codeHint}>
+          Schickt den Einladungslink z. B. per WhatsApp. Wer ihn öffnet, landet direkt in eurer Familie. Auch für dein zweites Gerät.
+        </Text>
       </View>
 
       <BigButton label="Rangliste der Familie" variant="secondary" onPress={onStats} testID="rangliste" />
@@ -159,6 +169,9 @@ const styles = StyleSheet.create({
   memberName: { fontSize: font.body, fontWeight: "700", color: colors.text },
   memberSeen: { fontSize: font.small, color: colors.textMuted },
   codeBox: { marginTop: space.l, borderRadius: radius, borderWidth: 2, borderColor: colors.border, padding: space.m, alignItems: "center", gap: 2 },
+  link: { fontSize: font.small, color: colors.textMuted, textAlign: "center" },
+  inviteButton: { alignSelf: "stretch", marginTop: space.s },
+  codeHint: { fontSize: font.small, color: colors.textMuted, textAlign: "center", lineHeight: font.small * 1.4 },
   codeLabel: { fontSize: font.small, color: colors.textMuted },
   code: { fontSize: font.title, fontWeight: "800", color: colors.primary, letterSpacing: 2 },
   champ: {

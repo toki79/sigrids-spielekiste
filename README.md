@@ -58,7 +58,9 @@ wie eine App ablegen).
 
 - Server: Firebase-Projekt `sigrids-spielestube` (Spark-Tarif, kostenlos), Zugangsdaten in
   `app/src/online/firebaseConfig.ts`
-- Anmeldung anonym; man tritt einmalig mit **Familiencode** und **Namen** bei
+- Anmeldung anonym; man tritt einmalig mit **Familiencode** und **Namen** bei – oder über den
+  **Einladungslink** (`…/sigrids-spielekiste/?familie=CODE`, in der App „Familie einladen“)
+- Eine Person kann auf mehreren Geräten spielen: dort einfach „Ich bin …“ antippen
 - Daten: `families/{CODE}` (Mitglieder, „gerade da“) und `families/{CODE}/games/{id}` (Partien)
 - **Sicherheitsregeln** stehen in `firestore.rules`. Nach jeder Änderung in der
   Firebase-Konsole einfügen: Firestore Database → Regeln → Inhalt ersetzen → Veröffentlichen

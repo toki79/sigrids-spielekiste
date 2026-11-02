@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import type { WoerterState } from "@spielestube/woerterei";
 import { loadDictionary } from "./src/dictionary";
 import { getGame } from "./src/game";
@@ -12,6 +12,7 @@ import { StartScreen } from "./src/screens/StartScreen";
 import { VoteScreen } from "./src/screens/VoteScreen";
 import { loadGame, saveGame } from "./src/storage";
 import { loadMembership, type Membership } from "./src/online/session";
+import { clearInviteFromAddressBar, parseInvite } from "./src/online/invite";
 import { OnlineArea } from "./src/screens/online/OnlineArea";
 import { colors, font, space } from "./src/theme";
 
@@ -21,16 +22,38 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("laden");
   const [game, setGame] = useState<WoerterState | null>(null);
   const [membership, setMembership] = useState<Membership | null>(null);
+  const [invite, setInvite] = useState<string | null>(null);
 
   useEffect(() => {
     // Erst den Ladebildschirm zeigen, dann Wörterbuch und gespeicherte Partie laden.
     const t = setTimeout(async () => {
       loadDictionary();
       setGame(await loadGame());
-      setMembership(await loadMembership());
-      setScreen("start");
+      const m = await loadMembership();
+      setMembership(m);
+      // Über einen Einladungslink geöffnet?
+      const code = parseInvite(await Linking.getInitialURL().catch(() => null));
+      clearInviteFromAddressBar();
+      if (code && code !== m?.code) {
+        setInvite(code);
+        setScreen("online");
+      } else {
+        setScreen(code ? "online" : "start");
+      }
     }, 50);
     return () => clearTimeout(t);
+  }, []);
+
+  // Einladungslink, während die App schon läuft (Android/iOS)
+  useEffect(() => {
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      const code = parseInvite(url);
+      if (code) {
+        setInvite(code);
+        setScreen("online");
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   function update(next: WoerterState | null) {
@@ -79,7 +102,15 @@ export default function App() {
       );
       break;
     case "online":
-      content = <OnlineArea membership={membership} onMembershipChange={setMembership} onExit={() => setScreen("start")} />;
+      content = (
+        <OnlineArea
+          membership={membership}
+          invitedCode={invite && invite !== membership?.code ? invite : null}
+          onInviteHandled={() => setInvite(null)}
+          onMembershipChange={setMembership}
+          onExit={() => setScreen("start")}
+        />
+      );
       break;
     case "spieler":
       content = <SetupScreen onStart={startGame} onBack={() => setScreen("start")} />;
