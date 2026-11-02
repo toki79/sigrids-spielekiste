@@ -6,20 +6,33 @@ interface Props {
   state: WoerterState;
   /** Nebeneinander (Handy-Hochformat) oder untereinander (Tablet-Seitenleiste). */
   horizontal?: boolean;
+  /** Online: grüner Punkt für Spieler, die gerade in der App sind. */
+  onlineIds?: ReadonlySet<string>;
+  /** Online: dieser Spieler wird als „Du“ gekennzeichnet. */
+  viewerId?: string;
 }
 
 /** Punktestand aller Spieler; wer dran ist, ist hervorgehoben. */
-export function Scoreboard({ state, horizontal }: Props) {
+export function Scoreboard({ state, horizontal, onlineIds, viewerId }: Props) {
   return (
     <View style={[styles.wrap, horizontal && styles.horizontal]}>
       {state.players.map((p, i) => {
         const active = state.status === "laeuft" && i === state.turn;
         return (
           <View key={p.id} style={[styles.player, horizontal && styles.playerH, active && styles.active]}>
-            <Text style={[styles.name, active && styles.activeText]} numberOfLines={1}>
-              {active ? "▶ " : ""}
-              {p.name}
-            </Text>
+            <View style={styles.nameRow}>
+              {onlineIds && (
+                <View
+                  style={[styles.dot, onlineIds.has(p.id) ? styles.dotOn : styles.dotOff]}
+                  accessibilityLabel={onlineIds.has(p.id) ? "gerade da" : "nicht da"}
+                />
+              )}
+              <Text style={[styles.name, active && styles.activeText]} numberOfLines={1}>
+                {active ? "▶ " : ""}
+                {p.name}
+                {viewerId === p.id ? " (du)" : ""}
+              </Text>
+            </View>
             <Text style={[styles.score, active && styles.activeText]}>{p.score}</Text>
           </View>
         );
@@ -53,6 +66,10 @@ const styles = StyleSheet.create({
   },
   playerH: { flexGrow: 1, flexBasis: 130 },
   active: { borderColor: colors.primary, backgroundColor: "#E8F0FB" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 },
+  dot: { width: 12, height: 12, borderRadius: 6 },
+  dotOn: { backgroundColor: colors.success },
+  dotOff: { backgroundColor: "#C4C4C4" },
   name: { fontSize: font.body, color: colors.text, fontWeight: "600", flexShrink: 1 },
   score: { fontSize: font.large, color: colors.text, fontWeight: "800" },
   activeText: { color: colors.primary },

@@ -4,12 +4,15 @@ import { BigButton } from "../components/BigButton";
 import { colors, font, radius, space } from "../theme";
 
 interface Props {
+  /** Name, wenn dieses Gerät schon einer Familie beigetreten ist. */
+  onlineName: string | null;
+  onOnline: () => void;
   savedGame: WoerterState | null;
   onContinue: () => void;
   onNewGame: () => void;
 }
 
-export function StartScreen({ savedGame, onContinue, onNewGame }: Props) {
+export function StartScreen({ onlineName, onOnline, savedGame, onContinue, onNewGame }: Props) {
   const running = savedGame && savedGame.status === "laeuft";
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
@@ -19,18 +22,30 @@ export function StartScreen({ savedGame, onContinue, onNewGame }: Props) {
       <Text style={styles.subtitle}>Schön, dass du da bist!</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Wörterei</Text>
-        <Text style={styles.cardText}>Das Wortlegespiel für 2 bis 4 Spieler. Das Tablet wird reihum weitergegeben.</Text>
+        <Text style={styles.cardTitle}>Wörterei – online</Text>
+        <Text style={styles.cardText}>
+          Jeder spielt an seinem eigenen Handy oder Tablet. Die Züge der anderen erscheinen sofort.
+        </Text>
+        <BigButton
+          label={onlineName ? `Meine Partien (${onlineName})` : "Online mit der Familie spielen"}
+          onPress={onOnline}
+          testID="online"
+        />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Wörterei – am selben Gerät</Text>
+        <Text style={styles.cardText}>Für 2 bis 4 Spieler an einem Tisch. Das Tablet wird reihum weitergegeben.</Text>
         {running ? (
           <>
             <Text style={styles.cardText}>
               Es läuft noch eine Partie mit {savedGame.players.map((p) => p.name).join(", ")}.
             </Text>
-            <BigButton label="Partie fortsetzen" onPress={onContinue} testID="weiter" />
+            <BigButton label="Partie fortsetzen" variant="secondary" onPress={onContinue} testID="weiter" />
             <BigButton label="Neue Partie beginnen" variant="secondary" onPress={onNewGame} testID="neu" />
           </>
         ) : (
-          <BigButton label="Neue Partie beginnen" onPress={onNewGame} testID="neu" />
+          <BigButton label="Neue Partie beginnen" variant="secondary" onPress={onNewGame} testID="neu" />
         )}
       </View>
 

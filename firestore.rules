@@ -1,0 +1,50 @@
+rules_version = '2';
+
+// Sicherheitsregeln für Sigrids Spielestube.
+//
+// Grundidee: Wer den Familiencode kennt, darf der Familie beitreten.
+// Partien einer Familie dürfen nur Geräte lesen und schreiben, die der
+// Familie beigetreten sind (ihre anonyme Anmeldung steht in `uids`).
+//
+// Einfügen: Firebase-Konsole → Firestore Database → Regeln → alles ersetzen → Veröffentlichen.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(code) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/families/$(code)).data.uids;
+    }
+
+    match /families/{code} {
+      // Einen bestimmten Code nachschlagen darf jeder angemeldete Nutzer
+      // (sonst könnte man nicht beitreten). Auflisten aller Familien: nein.
+      allow get: if signedIn();
+      allow list: if false;
+
+      // Gründen: nur mit sich selbst als einzigem Gerät.
+      allow create: if signedIn()
+        && request.resource.data.code == code
+        && request.resource.data.uids == [request.auth.uid]
+        && request.resource.data.members is map;
+
+      // Ändern (Beitreten, „gerade da“): eigene Kennung muss danach drinstehen,
+      // niemand darf entfernt werden, der Code bleibt gleich.
+      allow update: if signedIn()
+        && request.auth.uid in request.resource.data.uids
+        && request.resource.data.uids.hasAll(resource.data.uids)
+        && request.resource.data.code == resource.data.code
+        && request.resource.data.members.keys().hasAll(resource.data.members.keys());
+
+      allow delete: if false;
+
+      match /games/{gameId} {
+        allow read, create, update, delete: if isMember(code);
+      }
+    }
+  }
+}

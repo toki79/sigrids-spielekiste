@@ -24,7 +24,8 @@ Später kommen weitere Spiele als eigene Pakete dazu.
 - [x] Etappe 1: Spielregeln und Wortliste der Wörterei (getestet)
 - [x] Etappe 2: Modus „Am selben Gerät“ (erste spielbare App)
 - [ ] Etappe 3: Seniorengerechte Oberfläche, Praxistest
-- [ ] Etappe 4: Online-Modus (Firebase, Push über Expo)
+- [x] Etappe 4a: Online-Modus (Familiencode, Live-Partien über Firebase)
+- [ ] Etappe 4b: Push-Nachrichten „Du bist dran“ (mit der echten Android-App)
 - [ ] Etappe 5: Verteilung über Google Play (geschlossener Testkanal)
 
 ## Entwickeln
@@ -52,6 +53,18 @@ wie eine App ablegen).
    auf Android in Expo Go. Handy und Rechner müssen im selben WLAN sein.
 
 **Im Browser:** `npm run app:web` und dann http://localhost:8081 öffnen.
+
+### Online-Modus
+
+- Server: Firebase-Projekt `sigrids-spielestube` (Spark-Tarif, kostenlos), Zugangsdaten in
+  `app/src/online/firebaseConfig.ts`
+- Anmeldung anonym; man tritt einmalig mit **Familiencode** und **Namen** bei
+- Daten: `families/{CODE}` (Mitglieder, „gerade da“) und `families/{CODE}/games/{id}` (Partien)
+- **Sicherheitsregeln** stehen in `firestore.rules`. Nach jeder Änderung in der
+  Firebase-Konsole einfügen: Firestore Database → Regeln → Inhalt ersetzen → Veröffentlichen
+  (oder `npx firebase-tools deploy --only firestore:rules`)
+- Zum Testen ohne Server: Web-Version mit `?backend=local&geraet=1` und in einem zweiten
+  Tab `?backend=local&geraet=2` öffnen – zwei simulierte Geräte
 
 ### Bedienung (Wörterei, am selben Gerät)
 

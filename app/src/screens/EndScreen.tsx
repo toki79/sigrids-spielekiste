@@ -8,9 +8,11 @@ interface Props {
   state: WoerterState;
   onNewGame: () => void;
   onMenu: () => void;
+  newGameLabel?: string;
+  menuLabel?: string;
 }
 
-export function EndScreen({ state, onNewGame, onMenu }: Props) {
+export function EndScreen({ state, onNewGame, onMenu, newGameLabel = "Neue Partie", menuLabel = "Zum Hauptmenü" }: Props) {
   const res = result(state);
   const end = state.history.at(-1);
   const winners = res.winners.map((id) => playerName(state, id));
@@ -42,8 +44,8 @@ export function EndScreen({ state, onNewGame, onMenu }: Props) {
         })}
       </View>
 
-      <BigButton label="Neue Partie" onPress={onNewGame} />
-      <BigButton label="Zum Hauptmenü" variant="secondary" onPress={onMenu} />
+      <BigButton label={newGameLabel} onPress={onNewGame} />
+      <BigButton label={menuLabel} variant="secondary" onPress={onMenu} />
     </ScrollView>
   );
 }

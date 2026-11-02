@@ -10,19 +10,23 @@ import { HandoverScreen } from "./src/screens/HandoverScreen";
 import { SetupScreen } from "./src/screens/SetupScreen";
 import { StartScreen } from "./src/screens/StartScreen";
 import { loadGame, saveGame } from "./src/storage";
+import { loadMembership, type Membership } from "./src/online/session";
+import { OnlineArea } from "./src/screens/online/OnlineArea";
 import { colors, font, space } from "./src/theme";
 
-type Screen = "laden" | "start" | "spieler" | "uebergabe" | "spiel" | "ende";
+type Screen = "laden" | "start" | "online" | "spieler" | "uebergabe" | "spiel" | "ende";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("laden");
   const [game, setGame] = useState<WoerterState | null>(null);
+  const [membership, setMembership] = useState<Membership | null>(null);
 
   useEffect(() => {
     // Erst den Ladebildschirm zeigen, dann Wörterbuch und gespeicherte Partie laden.
     const t = setTimeout(async () => {
       loadDictionary();
       setGame(await loadGame());
+      setMembership(await loadMembership());
       setScreen("start");
     }, 50);
     return () => clearTimeout(t);
@@ -59,11 +63,16 @@ export default function App() {
     case "start":
       content = (
         <StartScreen
+          onlineName={membership?.name ?? null}
+          onOnline={() => setScreen("online")}
           savedGame={game}
           onContinue={() => setScreen(game?.status === "beendet" ? "ende" : "uebergabe")}
           onNewGame={() => setScreen("spieler")}
         />
       );
+      break;
+    case "online":
+      content = <OnlineArea membership={membership} onMembershipChange={setMembership} onExit={() => setScreen("start")} />;
       break;
     case "spieler":
       content = <SetupScreen onStart={startGame} onBack={() => setScreen("start")} />;

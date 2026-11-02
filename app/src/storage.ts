@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { deviceKey } from "./deviceKey";
 import type { WoerterState } from "@spielestube/woerterei";
 
-const KEY = "spielestube.woerterei.partie.v1";
+const KEY = deviceKey("spielestube.woerterei.partie.v1");
 
 /** Die laufende Partie am selben Gerät wird nach jedem Zug gespeichert. */
 export async function saveGame(state: WoerterState | null): Promise<void> {

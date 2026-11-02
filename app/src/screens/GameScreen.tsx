@@ -28,6 +28,12 @@ interface Props {
   state: WoerterState;
   onMove: (next: WoerterState) => void;
   onMenu: () => void;
+  /** Online: Wer schaut auf dieses Gerät? Dann wird nur dessen Bank gezeigt. */
+  viewerId?: string;
+  /** Online: Wer ist gerade in der App (für den grünen Punkt)? */
+  onlineIds?: ReadonlySet<string>;
+  /** Online: Zug wird gerade gespeichert. */
+  busy?: boolean;
 }
 
 interface Pending {
@@ -37,9 +43,13 @@ interface Pending {
 
 type Confirm = null | "aussetzen" | "menu" | "erlauben";
 
-export function GameScreen({ state, onMove, onMenu }: Props) {
+export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }: Props) {
   const { width, height } = useWindowDimensions();
-  const player = state.players[state.turn]!;
+  const current = state.players[state.turn]!;
+  // Am selben Gerät spielt immer, wer dran ist. Online sieht jeder nur seine eigene Bank.
+  const player = (viewerId && state.players.find((p) => p.id === viewerId)) || current;
+  const myTurn = state.status === "laeuft" && current.id === player.id;
+  const online = !!viewerId;
 
   const [rack, setRack] = useState<string[]>(player.rack);
   const [pending, setPending] = useState<Pending[]>([]);
@@ -109,7 +119,7 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
   }
 
   function onCellPress(row: number, col: number) {
-    if (mode !== "legen") return;
+    if (mode !== "legen" || !myTurn) return;
     const existing = pending.findIndex((p) => p.placement.row === row && p.placement.col === col);
     if (existing >= 0) {
       // Eigenen, noch nicht bestätigten Stein zurück auf die Bank
@@ -316,15 +326,23 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
       kind: "ok",
     };
   } else if (check && !check.ok) status = { text: check.message, kind: "error" };
-  else {
+  else if (!myTurn) {
+    const last = describeEntry(state, lastMoveEntry(state));
+    status = {
+      text: `${last ? `${last}\n` : ""}Jetzt ist ${current.name} dran. Sobald ${current.name} gelegt hat, siehst du es hier.`,
+      kind: "info",
+    };
+  } else {
     const last = describeEntry(state, lastMoveEntry(state));
     status = { text: last ?? "Lege das erste Wort über den Stern in der Mitte.", kind: "info" };
   }
 
+  const title = online ? (myTurn ? "Du bist dran" : `${current.name} ist dran`) : `${current.name} ist dran`;
+
   const panel = (
     <View style={[styles.panel, { width: panelWidth }]}>
-      {landscape && <Text style={styles.turnTitle}>{player.name} ist dran</Text>}
-      <Scoreboard state={state} horizontal={!landscape} />
+      {landscape && <Text style={[styles.turnTitle, !myTurn && styles.waitTitle]}>{title}</Text>}
+      <Scoreboard state={state} horizontal={!landscape} onlineIds={onlineIds} viewerId={viewerId} />
 
       <View
         style={[styles.status, status.kind === "ok" && styles.statusOk, status.kind === "error" && styles.statusError]}
@@ -340,8 +358,8 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
           ) : (
             <Draggable
               key={i}
-              dragDisabled={mode !== "legen"}
-              onTap={() => onRackPress(i)}
+              dragDisabled={mode !== "legen" || !myTurn}
+              onTap={() => (myTurn ? onRackPress(i) : undefined)}
               onStart={(x, y) => startDrag({ kind: "rack", index: i }, t, t === JOKER, x, y)}
               onMove={moveDrag}
               onEnd={(x, y, ok) => endDrag({ kind: "rack", index: i }, x, y, ok)}
@@ -361,12 +379,17 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
         )}
       </View>
 
-      {mode === "legen" ? (
+      {!myTurn ? (
+        <View style={styles.buttons}>
+          <BigButton label="Mischen" variant="secondary" compact onPress={shuffleRack} style={styles.half} />
+          <BigButton label={online ? "Zu meinen Partien" : "Menü"} variant="secondary" compact onPress={online ? onMenu : () => setConfirm("menu")} style={styles.half} />
+        </View>
+      ) : mode === "legen" ? (
         <View style={styles.buttons}>
           <BigButton
             testID="legen"
             label={check?.ok && evaluation ? `Zug legen – ${points(evaluation.score)}` : "Zug legen"}
-            disabled={!check?.ok}
+            disabled={!check?.ok || busy}
             onPress={() => commit({ type: "legen", placements })}
             style={styles.full}
           />
@@ -390,7 +413,13 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
             style={styles.half}
           />
           <BigButton label="Aussetzen" variant="secondary" compact onPress={() => setConfirm("aussetzen")} style={styles.half} />
-          <BigButton label="Menü" variant="secondary" compact onPress={() => setConfirm("menu")} style={styles.half} />
+          <BigButton
+            label={online ? "Zu meinen Partien" : "Menü"}
+            variant="secondary"
+            compact
+            onPress={online ? onMenu : () => setConfirm("menu")}
+            style={styles.half}
+          />
         </View>
       ) : (
         <View style={styles.buttons}>
@@ -418,7 +447,7 @@ export function GameScreen({ state, onMove, onMenu }: Props) {
     <>
       <View ref={rootRef} style={styles.root}>
       <ScrollView scrollEnabled={!drag} contentContainerStyle={[styles.wrap, landscape && styles.wrapLandscape]}>
-        {!landscape && <Text style={styles.turnTitle}>{player.name} ist dran</Text>}
+        {!landscape && <Text style={[styles.turnTitle, !myTurn && styles.waitTitle]}>{title}</Text>}
         <View>
           <Board
             ref={boardRef}
@@ -499,6 +528,7 @@ const styles = StyleSheet.create({
   wrap: { padding: 6, paddingBottom: space.xl, gap: space.m, alignItems: "center" },
   wrapLandscape: { flexDirection: "row", alignItems: "flex-start", justifyContent: "center", padding: 12, gap: 18 },
   turnTitle: { fontSize: font.title, fontWeight: "800", color: colors.primary, textAlign: "center" },
+  waitTitle: { color: colors.textMuted },
   panel: { gap: space.m },
   status: {
     backgroundColor: colors.messageBg,

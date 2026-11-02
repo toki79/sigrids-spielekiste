@@ -1,0 +1,227 @@
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, AppState, StyleSheet, Text, View } from "react-native";
+import type { WoerterState } from "@spielestube/woerterei";
+import { BigButton } from "../../components/BigButton";
+import { Dialog } from "../../components/Dialog";
+import { getGame } from "../../game";
+import { getBackend } from "../../online/backend";
+import { saveMembership, type Membership } from "../../online/session";
+import { isOnline, type Family, type OnlineGame } from "../../online/types";
+import { colors, font, space } from "../../theme";
+import { EndScreen } from "../EndScreen";
+import { GameScreen } from "../GameScreen";
+import { FamilySetupScreen } from "./FamilySetupScreen";
+import { NewOnlineGameScreen } from "./NewOnlineGameScreen";
+import { OnlineHomeScreen } from "./OnlineHomeScreen";
+
+interface Props {
+  membership: Membership | null;
+  onMembershipChange: (m: Membership | null) => void;
+  onExit: () => void;
+}
+
+type View_ = { kind: "home" } | { kind: "new" } | { kind: "game"; id: string };
+
+/** Online-Modus: Einrichtung, „Meine Partien“, neue Partie, laufende Partie. */
+export function OnlineArea({ membership, onMembershipChange, onExit }: Props) {
+  const [view, setView] = useState<View_>({ kind: "home" });
+  const [family, setFamily] = useState<Family | null>(null);
+  const [games, setGames] = useState<OnlineGame[] | null>(null);
+  const [problem, setProblem] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  // Anmelden, Mitgliedschaft auf diesem Gerät bestätigen, Familie und Partien beobachten
+  useEffect(() => {
+    if (!membership) return;
+    const backend = getBackend();
+    let cancelled = false;
+    const unsubs: (() => void)[] = [];
+    (async () => {
+      try {
+        await backend.signIn();
+        // Stellt sicher, dass dieses Gerät (auch nach Neuinstallation) zur Familie gehört.
+        await backend.joinFamily(membership.code, { memberId: membership.memberId });
+        if (cancelled) return;
+        setProblem(false);
+        unsubs.push(backend.watchFamily(membership.code, setFamily));
+        unsubs.push(
+          backend.watchGames(membership.code, membership.memberId, (g) => {
+            setGames(g);
+            setProblem(false);
+          }),
+        );
+      } catch (e) {
+        console.warn(e);
+        if (!cancelled) setProblem(true);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unsubs.forEach((u) => u());
+    };
+  }, [membership?.code, membership?.memberId]);
+
+  // „Gerade da“: jede Minute melden, solange die App im Vordergrund ist
+  useEffect(() => {
+    if (!membership || !ready) return;
+    const touch = () => void getBackend().touchPresence(membership.code, membership.memberId).catch(() => setProblem(true));
+    touch();
+    const timer = setInterval(() => {
+      if (AppState.currentState === "active") touch();
+    }, 60_000);
+    const sub = AppState.addEventListener("change", (s) => s === "active" && touch());
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, [membership?.code, membership?.memberId, ready]);
+
+  // Laufende Partie live beobachten
+  const [game, setGame] = useState<OnlineGame | null | undefined>(undefined);
+  const gameId = view.kind === "game" ? view.id : null;
+  useEffect(() => {
+    if (!membership || !gameId) return;
+    setGame(undefined);
+    return getBackend().watchGame(membership.code, gameId, setGame);
+  }, [membership?.code, gameId]);
+
+  const onlineIds = useMemo(() => new Set((family?.members ?? []).filter((m) => isOnline(m)).map((m) => m.id)), [family]);
+
+  if (!membership) {
+    return (
+      <FamilySetupScreen
+        onDone={(m) => {
+          void saveMembership(m);
+          onMembershipChange(m);
+          setView({ kind: "home" });
+        }}
+        onBack={onExit}
+      />
+    );
+  }
+
+  async function startGame(memberIds: string[]) {
+    if (!membership) return;
+    setBusy(true);
+    try {
+      const names = new Map((family?.members ?? []).map((m) => [m.id, m.name]));
+      const players = [membership.memberId, ...memberIds].map((id) => ({ id, name: names.get(id) ?? membership.name }));
+      const state = getGame().createGame(players, Math.floor(Math.random() * 2 ** 31));
+      const id = await getBackend().createGame(membership.code, state);
+      setView({ kind: "game", id });
+    } catch (e) {
+      console.warn(e);
+      setNotice("Die Partie konnte nicht gestartet werden. Bitte prüfe die Internetverbindung.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit(g: OnlineGame, next: WoerterState) {
+    if (!membership) return;
+    setBusy(true);
+    try {
+      const res = await getBackend().submitMove(membership.code, g.id, g.moveCount, next);
+      if (res === "conflict") setNotice("Die Partie hat sich inzwischen verändert. Bitte schau noch einmal aufs Brett und lege dann erneut.");
+    } catch (e) {
+      console.warn(e);
+      setNotice("Dein Zug konnte nicht gespeichert werden. Bitte prüfe die Internetverbindung und versuche es noch einmal.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  let content;
+  if (view.kind === "home") {
+    content = (
+      <OnlineHomeScreen
+        membership={membership}
+        family={family}
+        games={games}
+        connectionProblem={problem}
+        onOpenGame={(id) => setView({ kind: "game", id })}
+        onNewGame={() => setView({ kind: "new" })}
+        onBack={onExit}
+        onLeave={() => setConfirmLeave(true)}
+      />
+    );
+  } else if (view.kind === "new") {
+    content = (
+      <NewOnlineGameScreen
+        membership={membership}
+        family={family}
+        busy={busy}
+        onStart={startGame}
+        onBack={() => setView({ kind: "home" })}
+      />
+    );
+  } else if (game === undefined) {
+    content = (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.text}>Die Partie wird geladen …</Text>
+      </View>
+    );
+  } else if (game === null) {
+    content = (
+      <View style={styles.center}>
+        <Text style={styles.text}>Diese Partie gibt es nicht mehr.</Text>
+        <BigButton label="Zu meinen Partien" onPress={() => setView({ kind: "home" })} />
+      </View>
+    );
+  } else if (game.status === "beendet") {
+    content = (
+      <EndScreen
+        state={game.state}
+        newGameLabel="Neue Partie starten"
+        menuLabel="Zu meinen Partien"
+        onNewGame={() => setView({ kind: "new" })}
+        onMenu={() => setView({ kind: "home" })}
+      />
+    );
+  } else {
+    content = (
+      <GameScreen
+        state={game.state}
+        viewerId={membership.memberId}
+        onlineIds={onlineIds}
+        busy={busy}
+        onMove={(next) => void submit(game, next)}
+        onMenu={() => setView({ kind: "home" })}
+      />
+    );
+  }
+
+  return (
+    <>
+      {content}
+      <Dialog visible={!!notice} title="Hinweis" message={notice ?? ""} cancelLabel="OK" onCancel={() => setNotice(null)} />
+      <Dialog
+        visible={confirmLeave}
+        title="Auf diesem Gerät abmelden?"
+        message="Deine Partien bleiben erhalten. Um wieder mitzuspielen, gibst du den Familiencode erneut ein und tippst auf deinen Namen."
+        confirmLabel="Abmelden"
+        danger
+        onConfirm={() => {
+          setConfirmLeave(false);
+          void saveMembership(null);
+          onMembershipChange(null);
+          setFamily(null);
+          setGames(null);
+          onExit();
+        }}
+        onCancel={() => setConfirmLeave(false)}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.l, padding: space.xl },
+  text: { fontSize: font.large, color: colors.text, textAlign: "center" },
+});
