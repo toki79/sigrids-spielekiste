@@ -15,20 +15,25 @@ export const EMPTY = ".";
 export type Premium = "W3" | "W2" | "L3" | "L2" | "START";
 
 /**
- * Bonusfelder im oberen linken Achtel (Zeile ≤ Spalte ≤ 7).
- * Daraus wird das ganze Brett durch Spiegelung erzeugt (achtfach symmetrisch).
+ * Bonusfelder im oberen linken Achtel (Zeile ≤ Spalte ≤ 7), in der
+ * klassischen, aus dem Brettspiel vertrauten Anordnung.
+ * Daraus wird das ganze Brett durch Spiegelung erzeugt (achtfach symmetrisch):
+ * 8 × Dreifach-Wort, 16 × Doppel-Wort, 12 × Dreifach-Buchstabe,
+ * 24 × Doppel-Buchstabe, Stern in der Mitte.
  */
 const PREMIUM_SEEDS: ReadonlyArray<[number, number, Premium]> = [
-  [0, 2, "W3"],
+  [0, 0, "W3"],
+  [0, 7, "W3"],
   [1, 1, "W2"],
+  [2, 2, "W2"],
+  [3, 3, "W2"],
   [4, 4, "W2"],
-  [2, 6, "W2"],
-  [1, 4, "L3"],
-  [6, 6, "L3"],
-  [0, 6, "L2"],
-  [3, 3, "L2"],
-  [3, 5, "L2"],
-  [4, 7, "L2"],
+  [1, 5, "L3"],
+  [5, 5, "L3"],
+  [0, 3, "L2"],
+  [2, 6, "L2"],
+  [3, 7, "L2"],
+  [6, 6, "L2"],
   [CENTER, CENTER, "START"],
 ];
 

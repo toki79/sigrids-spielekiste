@@ -33,6 +33,28 @@ describe("Spielbrett", () => {
       }
     }
   });
+
+  it("hat die klassische Anordnung der Bonusfelder", () => {
+    const counts: Record<string, number> = {};
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        const p = premiumAt(r, c);
+        if (p) counts[p] = (counts[p] ?? 0) + 1;
+      }
+    }
+    expect(counts).toEqual({ W3: 8, W2: 16, L3: 12, L2: 24, START: 1 });
+    // Stichproben der ersten Zeilen
+    const row = (r: number) =>
+      Array.from({ length: BOARD_SIZE }, (_, c) => {
+        const p = premiumAt(r, c);
+        return p ? { W3: "#", W2: "=", L3: "+", L2: "-", START: "*" }[p] : ".";
+      }).join("");
+    expect(row(0)).toBe("#..-...#...-..#");
+    expect(row(1)).toBe(".=...+...+...=.");
+    expect(row(2)).toBe("..=...-.-...=..");
+    expect(row(3)).toBe("-..=...-...=..-");
+    expect(row(7)).toBe("#..-...*...-..#");
+  });
 });
 
 describe("Erster Zug", () => {
@@ -163,18 +185,28 @@ describe("Wertung", () => {
     expect(r.ok && r.evaluation.allTilesBonus).toBe(50);
   });
 
-  it("multipliziert Wortfelder, wenn ein Wort zwei davon belegt", () => {
-    // Senkrecht in Spalte 6: (6,6)=L3, (8,6)=L3. Wir legen ein 3er-Wort auf Wortfelder:
-    // Zeile 2: (2,6)=W2 und (2,8)=W2 → Wort von (2,6) bis (2,8) braucht Anschluss.
-    const board = boardWith({ text: "TOR", row: 3, col: 6 });
-    const r = checkPlay(board, word("AST", 2, 6), { dictionary: CompactDictionary.fromWords(["AST", "AT", "SO", "TR", "TOR"]) });
-    // Querwörter: A über T = "AT", S über O = "SO", T über R = "TR"
-    expect(r.ok).toBe(true);
-    if (r.ok) {
-      expect(premiumAt(2, 6)).toBe("W2");
-      expect(premiumAt(2, 8)).toBe("W2");
-      const ast = r.evaluation.words.find((w) => w.word === "AST")!;
-      expect(ast.score).toBe((1 + 1 + 1) * 4);
-    }
+  it("verdoppelt das Wort auf einem Doppel-Wort-Feld", () => {
+    // OR liegt auf (3,4)-(3,5); T auf (3,3) = Doppel-Wort → TOR = (1+2+1) × 2 = 8
+    expect(premiumAt(3, 3)).toBe("W2");
+    const board = boardWith({ text: "OR", row: 3, col: 4 });
+    const r = checkPlay(board, [{ row: 3, col: 3, letter: "T" }], { dictionary: dict });
+    expect(r.ok && r.evaluation.score).toBe(8);
+  });
+
+  it("verdreifacht den Buchstaben auf einem Dreifach-Buchstaben-Feld", () => {
+    // S liegt auf (1,6); E auf (1,5) = Dreifach-Buchstabe → ES = 1×3 + 1 = 4
+    expect(premiumAt(1, 5)).toBe("L3");
+    const board = boardWith({ text: "S", row: 1, col: 6 });
+    const r = checkPlay(board, [{ row: 1, col: 5, letter: "E" }], { dictionary: dict });
+    expect(r.ok && r.evaluation.score).toBe(4);
+  });
+
+  it("multipliziert zwei Dreifach-Wort-Felder in einem Wort (× 9)", () => {
+    // ABENDROT in Zeile 0, D liegt schon auf (0,4). (0,0) und (0,7) = Dreifach-Wort, (0,3) = Doppel-Buchstabe.
+    // A1 B3 E1 N1×2 D1 R1 O2 T1 = 12 → × 9 = 108, + 50 für alle sieben Steine = 158
+    const board = boardWith({ text: "D", row: 0, col: 4 });
+    const placements = word("ABENDROT", 0, 0).filter((p) => p.col !== 4);
+    const r = checkPlay(board, placements, { dictionary: CompactDictionary.fromWords(["ABENDROT"]) });
+    expect(r.ok && r.evaluation.score).toBe(158);
   });
 });

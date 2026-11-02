@@ -36,8 +36,9 @@ npm run typecheck # TypeScript prüfen
 
 ## Wörterei – Regeln in Kürze
 
-- 15 × 15 Felder mit eigener Anordnung der Bonusfelder
+- 15 × 15 Felder mit der klassischen, vertrauten Anordnung der Bonusfelder
   (Doppel-/Dreifach-Buchstabe, Doppel-/Dreifach-Wort, Stern in der Mitte zählt doppelt)
+- Optik: schlicht, hell, auf gute Lesbarkeit ausgelegt; eigener Name und eigene Farben
 - 102 Steine (100 Buchstaben inkl. Ä, Ö, Ü + 2 Joker), kein ß – es wird als SS gelegt
 - 7 Steine auf der Bank, 50 Bonuspunkte für alle sieben in einem Zug
 - Erstes Wort über die Mitte, danach immer anschließend
