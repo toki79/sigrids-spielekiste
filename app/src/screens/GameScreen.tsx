@@ -33,6 +33,8 @@ interface Props {
   onlineIds?: ReadonlySet<string>;
   /** Online: Zug wird gerade gespeichert. */
   busy?: boolean;
+  /** Online: Link zu dieser Partie teilen. */
+  onShare?: () => void;
 }
 
 interface Pending {
@@ -42,7 +44,7 @@ interface Pending {
 
 type Confirm = null | "aussetzen" | "menu" | "erlauben";
 
-export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }: Props) {
+export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy, onShare }: Props) {
   const { width, height } = useWindowDimensions();
   const current = state.players[state.turn]!;
   // Am selben Gerät spielt immer, wer dran ist. Online sieht jeder nur seine eigene Bank.
@@ -419,6 +421,7 @@ export function GameScreen({ state, onMove, onMenu, viewerId, onlineIds, busy }:
         </View>
       ) : !myTurn ? (
         <View style={styles.buttons}>
+          {onShare && <BigButton label="Link zur Partie schicken" variant="secondary" compact onPress={onShare} style={styles.full} />}
           <BigButton label="Mischen" variant="secondary" compact onPress={shuffleRack} style={styles.half} />
           <BigButton label={online ? "Zu meinen Partien" : "Menü"} variant="secondary" compact onPress={online ? onMenu : () => setConfirm("menu")} style={styles.half} />
         </View>

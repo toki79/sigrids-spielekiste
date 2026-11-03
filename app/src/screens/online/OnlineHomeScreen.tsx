@@ -14,6 +14,7 @@ interface Props {
   games: OnlineGame[] | null;
   connectionProblem: string | false;
   onOpenGame: (id: string) => void;
+  onShareGame: (game: OnlineGame) => void;
   onNewGame: () => void;
   onStats: () => void;
   onInvite: () => void;
@@ -34,7 +35,7 @@ function scoreLine(game: OnlineGame): string {
 }
 
 /** „Meine Partien“: wer ist dran, neue Partie, Familiencode. */
-export function OnlineHomeScreen({ membership, family, games, connectionProblem, onOpenGame, onNewGame, onStats, onInvite, champions, onBack, onLeave }: Props) {
+export function OnlineHomeScreen({ membership, family, games, connectionProblem, onOpenGame, onShareGame, onNewGame, onStats, onInvite, champions, onBack, onLeave }: Props) {
   const me = membership.memberId;
   const needsMe = (g: OnlineGame) => gameOf(g.state).playersToAct(g.state).includes(me);
   const mine = (games ?? []).filter((g) => g.status === "laeuft" && needsMe(g));
@@ -71,6 +72,16 @@ export function OnlineHomeScreen({ membership, family, games, connectionProblem,
                 : `${turnName} ist dran`}
         </Text>
         <Text style={styles.gameScore}>{scoreLine(g)}</Text>
+        {kind !== "done" && (
+          <Pressable
+            onPress={() => onShareGame(g)}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.share, pressed && styles.pressed]}
+            testID="partie-teilen"
+          >
+            <Text style={styles.shareText}>Link zur Partie schicken</Text>
+          </Pressable>
+        )}
       </Pressable>
     );
   };
@@ -168,6 +179,8 @@ const styles = StyleSheet.create({
   game: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 2, borderRadius: radius, padding: space.l, gap: 4 },
   gameMine: { borderColor: colors.primary, borderWidth: 3, backgroundColor: "#E8F0FB" },
   pressed: { opacity: 0.8 },
+  share: { alignSelf: "flex-start", marginTop: space.s, borderWidth: 2, borderColor: colors.primary, borderRadius: 8, paddingHorizontal: space.m, paddingVertical: 8 },
+  shareText: { fontSize: font.small, color: colors.primary, fontWeight: "700" },
   gameHead: { flexDirection: "row", alignItems: "center", gap: space.m },
   gameTitle: { fontSize: font.large, fontWeight: "700", color: colors.text },
   gameState: { fontSize: font.body, color: colors.textMuted, fontWeight: "600" },

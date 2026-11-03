@@ -29,6 +29,8 @@ interface Props {
   liveDraft?: TileId[][] | null;
   /** Online: eigener Versuch hat sich geändert (null = nichts verändert). */
   onDraftChange?: (table: TileId[][] | null) => void;
+  /** Online: Link zu dieser Partie teilen. */
+  onShare?: () => void;
 }
 
 const spiel = createZahlenromme();
@@ -37,7 +39,7 @@ interface Rect { x: number; y: number; w: number; h: number }
 type DropTarget = { kind: "set"; index: number } | { kind: "neu" } | { kind: "bank" } | null;
 
 /** Spielbildschirm Zahlen-Rommé: Tisch mit Reihen, eigene Bank, Antippen oder Ziehen. */
-export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy, liveDraft, onDraftChange }: Props) {
+export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy, liveDraft, onDraftChange, onShare }: Props) {
   const { width, height } = useWindowDimensions();
   const current = state.players[state.turn]!;
   const me = (viewerId && state.players.find((p) => p.id === viewerId)) || current;
@@ -422,6 +424,9 @@ export function RommeScreen({ state, onMove, onMenu, viewerId, onlineIds, busy, 
             )}
           </>
         ) : null}
+        {onShare && !myTurn && (
+          <BigButton label="Link schicken" variant="secondary" compact onPress={onShare} style={styles.small} testID="link-schicken" />
+        )}
         <BigButton label="Nach Farbe" variant="secondary" compact onPress={() => setRack((r) => sortByColor(r))} style={styles.small} />
         <BigButton label="Nach Zahl" variant="secondary" compact onPress={() => setRack((r) => sortByNumber(r))} style={styles.small} />
         <BigButton

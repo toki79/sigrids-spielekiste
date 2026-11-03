@@ -63,6 +63,8 @@ wie eine App ablegen).
 - Anmeldung anonym; man tritt einmalig mit **Familiencode** und **Namen** bei – oder über den
   **Einladungslink** (`…/sigrids-spielekiste/?familie=CODE`, in der App „Familie einladen“)
 - Eine Person kann auf mehreren Geräten spielen: dort einfach „Ich bin …“ antippen
+- **Partie-Link** (`…?familie=CODE&partie=ID`): „Link zur Partie schicken“ in Meine Partien bzw. im Spiel –
+  öffnet die Partie direkt (vorher ggf. „Wer bist du?“)
 - Daten: `families/{CODE}` (Mitglieder, „gerade da“) und `families/{CODE}/games/{id}` (Partien)
 - **Sicherheitsregeln** stehen in `firestore.rules`. Nach jeder Änderung in der
   Firebase-Konsole einfügen: Firestore Database → Regeln → Inhalt ersetzen → Veröffentlichen

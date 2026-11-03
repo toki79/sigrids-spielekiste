@@ -14,7 +14,7 @@ import { StartScreen } from "./src/screens/StartScreen";
 import { VoteScreen } from "./src/screens/VoteScreen";
 import { loadGame, saveGame } from "./src/storage";
 import { loadMembership, type Membership } from "./src/online/session";
-import { clearInviteFromAddressBar, parseInvite } from "./src/online/invite";
+import { clearInviteFromAddressBar, parseGameId, parseInvite } from "./src/online/invite";
 import { OnlineArea } from "./src/screens/online/OnlineArea";
 import { colors, font, space } from "./src/theme";
 
@@ -28,6 +28,8 @@ export default function App() {
   const [active, setActive] = useState<GameType>("woerterei");
   const [membership, setMembership] = useState<Membership | null>(null);
   const [invite, setInvite] = useState<string | null>(null);
+  /** Partie aus einem Partie-Link, die direkt geöffnet werden soll. */
+  const [openGame, setOpenGame] = useState<{ code: string; id: string } | null>(null);
   const game = saved[active] ?? null;
 
   useEffect(() => {
@@ -40,9 +42,12 @@ export default function App() {
       const m = await loadMembership();
       setMembership(m);
       // Über einen Einladungslink geöffnet?
-      const code = parseInvite(await Linking.getInitialURL().catch(() => null));
+      const url = await Linking.getInitialURL().catch(() => null);
+      const code = parseInvite(url);
+      const gameId = parseGameId(url);
       clearInviteFromAddressBar();
       if (code && code !== m?.code) setInvite(code);
+      if (code && gameId) setOpenGame({ code, id: gameId });
       setScreen(code ? "online" : "start");
     }, 50);
     return () => clearTimeout(t);
@@ -52,8 +57,10 @@ export default function App() {
   useEffect(() => {
     const sub = Linking.addEventListener("url", ({ url }) => {
       const code = parseInvite(url);
+      const gameId = parseGameId(url);
       if (code) {
         setInvite(code);
+        if (gameId) setOpenGame({ code, id: gameId });
         setScreen("online");
       }
     });
@@ -119,6 +126,8 @@ export default function App() {
           membership={membership}
           invitedCode={invite && invite !== membership?.code ? invite : null}
           onInviteHandled={() => setInvite(null)}
+          openGame={openGame}
+          onOpenGameHandled={() => setOpenGame(null)}
           onMembershipChange={setMembership}
           onExit={() => setScreen("start")}
         />

@@ -8,7 +8,7 @@ import { Dialog } from "../../components/Dialog";
 import { getGame } from "../../game";
 import { getBackend } from "../../online/backend";
 import { describeError } from "../../online/errors";
-import { shareInvite } from "../../online/invite";
+import { gameMessage, shareInvite, shareText } from "../../online/invite";
 import { formatFamilyCode } from "@spielestube/core";
 import { saveMembership, type Membership } from "../../online/session";
 import { isOnline, type Family, type OnlineGame } from "../../online/types";
@@ -27,6 +27,9 @@ interface Props {
   /** Familiencode aus einem Einladungslink (wird nach Verwendung verworfen). */
   invitedCode?: string | null;
   onInviteHandled?: () => void;
+  /** Partie aus einem Partie-Link: nach dem Anmelden direkt öffnen. */
+  openGame?: { code: string; id: string } | null;
+  onOpenGameHandled?: () => void;
   onMembershipChange: (m: Membership | null) => void;
   onExit: () => void;
 }
@@ -34,7 +37,7 @@ interface Props {
 type View_ = { kind: "home" } | { kind: "new" } | { kind: "stats" } | { kind: "game"; id: string };
 
 /** Online-Modus: Einrichtung, „Meine Partien“, neue Partie, laufende Partie. */
-export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembershipChange, onExit }: Props) {
+export function OnlineArea({ membership, invitedCode, onInviteHandled, openGame, onOpenGameHandled, onMembershipChange, onExit }: Props) {
   const [view, setView] = useState<View_>({ kind: "home" });
   const [family, setFamily] = useState<Family | null>(null);
   const [games, setGames] = useState<OnlineGame[] | null>(null);
@@ -78,6 +81,14 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
       unsubs.forEach((u) => u());
     };
   }, [membership?.code, membership?.memberId]);
+
+  // Partie-Link: sobald dieses Gerät in der richtigen Familie ist, die Partie öffnen
+  useEffect(() => {
+    if (!openGame || !membership || !ready) return;
+    if (openGame.code === membership.code) setView({ kind: "game", id: openGame.id });
+    onOpenGameHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openGame?.id, membership?.code, ready]);
 
   // „Gerade da“: jede Minute melden, solange die App im Vordergrund ist
   useEffect(() => {
@@ -172,6 +183,13 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
     }
   }
 
+  async function shareGame(g: OnlineGame) {
+    if (!membership) return;
+    const next = g.state.status === "laeuft" ? (g.state.players[g.state.turn]?.name ?? null) : null;
+    const res = await shareText(gameMessage(membership.code, g.id, membership.name, GAMES[g.state.game].title, next), "Link zur Partie");
+    if (res === "kopiert") setNotice("Der Link zur Partie ist kopiert. Füge ihn z. B. in WhatsApp ein.");
+  }
+
   async function submit(g: OnlineGame, next: AnyState) {
     if (!membership) return;
     setBusy(true);
@@ -195,6 +213,7 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
         games={games}
         connectionProblem={problem}
         onOpenGame={(id) => setView({ kind: "game", id })}
+        onShareGame={(g) => void shareGame(g)}
         onNewGame={() => setView({ kind: "new" })}
         onStats={() => setView({ kind: "stats" })}
         onInvite={async () => {
@@ -248,6 +267,16 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
         <BigButton label="Zu meinen Partien" onPress={() => setView({ kind: "home" })} />
       </View>
     );
+  } else if (!game.playerIds.includes(membership.memberId)) {
+    content = (
+      <View style={styles.center}>
+        <Text style={styles.text}>
+          In dieser Partie spielen {game.state.players.map((p) => p.name).join(" und ")}. Du bist hier nicht dabei – starte doch eine eigene
+          Partie!
+        </Text>
+        <BigButton label="Zu meinen Partien" onPress={() => setView({ kind: "home" })} />
+      </View>
+    );
   } else if (game.status === "beendet") {
     content = (
       <EndScreen
@@ -268,6 +297,7 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
             : null
         }
         onDraftChange={(table) => sendDraft(table, game.moveCount)}
+        onShare={() => void shareGame(game)}
         viewerId={membership.memberId}
         onlineIds={onlineIds}
         busy={busy}
@@ -292,6 +322,7 @@ export function OnlineArea({ membership, invitedCode, onInviteHandled, onMembers
   } else {
     content = (
       <GameScreen
+        onShare={() => void shareGame(game)}
         state={game.state as WoerterState}
         viewerId={membership.memberId}
         onlineIds={onlineIds}
